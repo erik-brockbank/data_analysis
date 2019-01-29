@@ -1,0 +1,519 @@
+---
+title: "Phystables Containment v1 Analysis"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+suppressMessages(library(tidyverse))
+suppressMessages(library(knitr))
+setwd("/Users/erikbrockbank/web/vullab/data_processing/phystables_env/")
+```
+
+
+# Reading in Data #
+Raw data is created using a `json_to_csv.py` script in the same directory as this file which reads in json data for each individual participant and coalesces it into a column-wise csv where each row is an individual trial by a participant. 
+
+The primary columns we're interested in for this analysis are each participant's response time and accuracy across trials. We compute and modify these variables in the processing section. 
+
+```{r data}
+data = suppressMessages(read_csv("phystables_env_raw.csv"))
+glimpse(data)
+```
+
+Total participants:
+```{r data.summary}
+length(levels(as.factor(data$subjID)))
+```
+\pagebreak
+
+# Data Cleanup #
+## Response Time Cleanup ##
+
+### No Response Trials ###
+For trials in which participants did not make a guess, their responsetime retains its initialization value of -1. We set it to 10s * 1000 ms / s, since the trial could not last longer than 10s. This allows us to be able to compute log10 response time during Data Processing.
+```{r data.cleanup.resptime-1}
+data.no.resp = data %>%
+  filter(responsetime == -1)
+table(data.no.resp$subjID)
+  
+data$responsetime[data$responsetime == -1] = 10 * 1000
+```
+
+### Immediate Response Trials ###
+There are a handful of trials in which participants had a response time of 0. This will also be problematic when we try to calculate the log10 response time, so we set it to 1.
+
+**Is this the right way to handle this?**
+```{r data.cleanup.resptime0}
+data.immediate.resp = data %>%
+  filter(responsetime == 0)
+table(data.immediate.resp$subjID)
+
+data$responsetime[data$responsetime == 0] = 1
+```
+\pagebreak
+
+# Data Processing #
+We add columns detailing each trial's scenario (`l1`-`l4`), containment level (`l1`-`l3`), complexity level (`l1`-`l4`), and rotation (can be `NA`, `LEFT`, `RIGHT`, or `distractor` for distractor scenarios). 
+
+Additionally, we add columns for log response time and whether the participant was correct on each trial (computed by whether their guess of "red" or "green" matched the correct answer for that trial).
+
+We look at additional variants of response time in the response time analysis below. 
+
+```{r data.processing}
+# Add columns for scenario, containment, complexity, and rotation
+scenario.split = with(data, strsplit(trialname, "_"))
+data$scenario = unlist(lapply(scenario.split, "[", 2))
+data$containment = unlist(lapply(scenario.split, "[", 4))
+data$complexity = unlist(lapply(scenario.split, "[", 6))
+data$rotation = unlist(lapply(scenario.split, "[", 7))
+data$rotation[is.na(data$rotation)] = "NONE" # avoid NAs in this column
+# Add column for log response time
+data = data %>%
+  group_by(scenario, subjID) %>%
+  mutate(log.responsetime = log10(responsetime))
+# Add column for whether selection was correct
+data = data %>%
+  mutate(correct = trialtarget == usertarget)
+
+glimpse(data)
+```
+\pagebreak
+
+# Sanity Checks: Data Quality #
+In this section, we look at the data for each participant to ensure basic benchmarks for data quality are met. We outline these benchmarks explicitly, such as ensuring that no participants simply guessed "red" on every trial.
+
+## Participant Guesses ##
+Here we look at the proportion of "red" and "green" guesses that each participant made over all trials. 
+We are explicitly looking for a reasonable balance of each guess. If any participant selected exclusively "red", "green", or "no response", we would be concerned that they were not making an honest attempt at the task.
+```{r processing.guesses} 
+data %>%
+  ggplot(aes(x = subjID, fill = usertarget)) +
+  geom_bar(position = "fill", width = 0.75) +
+  theme(legend.position = "bottom", axis.text.x = element_blank()) +
+  labs(x = "Participant", y = "Response proportion (count 256)", fill = "Trial guess")
+```
+
+**Looks like all "no response" trials come from two participants: should we remove these trials from subsequent analysis?**
+```{r processing.noresponse}
+no.resp.data = data %>%
+  filter(usertarget == "no response")
+table(no.resp.data$subjID)
+```
+\pagebreak
+
+## Participant Accuracy ##
+Here we look at participant accuracy based on the proportion of their guesses which were correct. This number should not be so low that it reflects a lack of understanding of the task. If it is too high, we should be worried about ceiling effects. 
+```{r processing.accuracy}
+data %>%
+  ggplot(aes(x = subjID, fill = correct)) +
+  geom_bar(position = "fill", width = 0.75) +
+  theme(legend.position = "bottom", axis.text.x = element_blank()) +
+  labs(x = "Participant", y = "Response proportion (count 256)", fill = "Trial correct")
+```
+
+We can see one participant that has significantly lower accuracy overall than the others.
+**Should we remove this participant's data?**
+```{r processing.lowacc}
+low.accuracy = data %>%
+  group_by(subjID) %>%
+  summarize(correct.count = sum(correct),
+            total.count = length(correct),
+            correct.pct = correct.count / total.count) %>%
+  filter(correct.pct < 0.5)
+kable(low.accuracy)
+```
+\pagebreak
+
+## Participant Scores ##
+Here we look at the distribution of scores across all trials by each participant. These scores will be a combination of -10 for incorrect trials, 0 for no response trials, and a number > 0 for correct guesses that exponentially decays based on reponse time. If any participant has too many scores of 0 or -10 or if their scores > 0 don't show some variance, we should be concerned that they were not making an honest attempt at the task.
+```{r processing.scores}
+data %>%
+  ggplot(aes(x = subjID, y = score)) +
+  theme(axis.text.x = element_blank()) +
+  geom_jitter(alpha = 0.5, size = 0.8, width = 0.25, color = "blue") +
+  labs(x = "Participant", y = "Trial scores (max 120)")
+```
+\pagebreak
+
+## Participant Response Times ##
+Here we look at a number of features of participant log response times to make sure this data (our primary DV) is as expected. 
+
+### Overall Response Time Distribution ###
+First, we look at the overall distribution of participant log response times. This should be roughly normal.
+```{r processing.resptime.dist}
+data %>%
+  ggplot(aes(x = log.responsetime)) +
+  geom_histogram(binwidth = 0.05) +
+  labs(x = "Response time (log10 ms)", y = "Trial Count")
+```
+\pagebreak
+
+### Individual Participant Response Time Distributions ###
+Next, we look at individual participants' distributions of log response times. These should have some variance and not be too close to 0, otherwise we would be concerned that participants were guessing as fast as possible without making an honest attempt (though this ought to be reflected in the accuracy analysis above as well).
+```{r processing.resptime.individualbox}
+data %>%
+  ggplot(aes(x = subjID, y = log.responsetime)) +
+  geom_jitter(width = 0.25, alpha = 0.5, color = "blue") +
+  theme(axis.text.x = element_blank()) +
+  labs(x = "Participant", y = "Response time (log10 ms)")
+```
+\pagebreak
+
+### Individual Participant Response Times by Trial Index ###
+Finally, we look at participant log response times by trial index in order to ensure that participants do not show signs of giving up as the task wears on or learning significantly over the course of the task.
+
+In the first graph below, we don't see signs of individual responses dropping to consistently low levels that would signal becoming tired of the task and guessing (this would in theory show up in the accuracy analysis as well but this view is more fine-grained).
+```{r processing.resptime.individualtimeseries}
+data %>%
+  ggplot(aes(x = trialindex, y = log.responsetime, color = subjID)) +
+  geom_line() +
+  theme(legend.position = "none") +
+  labs(x = "Trial Number (1 - 256)",
+       y = "Response time (log10 ms)",
+       color = "Participant")
+```
+\pagebreak
+
+In the graph below, a smoothed view of the previous one, we see some signs of participants learning over the course of the task. 
+
+**What do we need to do to confirm this?**
+```{r processing.resptime.individualtimeseries.smoothed}
+data %>%
+  ggplot(aes(x = trialindex, y = log.responsetime, color = subjID)) +
+  geom_smooth(method = 'lm') +
+  theme(legend.position = "none") +
+  labs(x = "Trial Number (1 - 256)",
+       y = "Response time smoothed (log10 ms)",
+       color = "Participant")
+```
+\pagebreak
+
+
+# Data Analysis #
+
+## Analysis Functions ##
+The supporting labels and functions below help with the analysis in the Response Time Analysis section.
+```{r analysis.globals}
+containment_labels = c(
+  l1 = "low containment",
+  l2 = "medium containment",
+  l3 = "high containment"
+)
+
+complexity_labels = c(
+  l1 = "none",
+  l2 = "low",
+  l3 = "medium",
+  l4 = "high"
+)
+
+scenario_labels = c(
+  sc1 = "scenario 1",
+  sc2 = "scenario 2",
+  sc3 = "scenario 3",
+  sc4 = "scenario 4"
+)
+```
+
+```{r analysis.functions}
+make.canonical.bargraph = function(df.means, title, xlab, ylab) {
+  df.means %>%
+    ggplot(aes(x = complexity, y = means)) +
+    geom_bar(stat = "identity", width = 0.5) +
+    scale_x_discrete(labels = complexity_labels) +
+    geom_errorbar(mapping = aes(ymin = se.lower, ymax = se.upper), width = 0.2) +
+    facet_wrap(. ~ containment,
+               scales = "free_x",
+               labeller = labeller(containment = containment_labels)) +
+    labs(x = xlab, y = ylab) +
+    ggtitle(title)
+}
+
+make.canonical.bargraph.scenario = function(df.means, title, xlab, ylab) {
+  df.means %>%
+    ggplot(aes(x = complexity, y = means, color = scenario)) +
+    geom_bar(stat = "identity", width = 0.5) +
+    scale_x_discrete(labels = complexity_labels) +
+    guides(color = FALSE) +
+    geom_errorbar(mapping = aes(ymin = se.lower, ymax = se.upper), width = 0.2) +
+    facet_grid(scenario ~ containment,
+               scales = "free_x",
+               labeller = labeller(containment = containment_labels,
+                                   scenario = scenario_labels)) +
+    labs(x = xlab, y = ylab) +
+    ggtitle(title)
+}
+```
+
+## Analysis Data Processing ##
+To support a more nuanced analysis of response time, we add columns for trial response time scaled by mean response time for each each participant, scenario. We also take the log of these response time modifications.
+```{r analysis.data.processing}
+data = data %>%
+  filter(rotation %in% c("NONE", "LEFT", "RIGHT", "TWICE")) %>%
+  group_by(scenario, subjID) %>%
+  mutate(trials = n(),
+         mean.scenario.subj.responsetime = mean(responsetime),
+         log.mean.scenario.subj.responsetime = mean(log.responsetime),
+         scaled.responsetime = responsetime - mean.scenario.subj.responsetime,
+         log.scaled.responsetime = log.responsetime - log.mean.scenario.subj.responsetime)
+
+glimpse(data)
+
+# sanity check the scaled responsetime: these should be 0
+data %>%
+  group_by(scenario, subjID) %>%
+  summarize(sum.scaled.responsetime = sum(scaled.responsetime),
+            sum.log.scaled.responsetime = sum(log.scaled.responsetime)) %>%
+  summarize(scaled.responsetime.check = max(sum.scaled.responsetime),
+            log.scaled.responsetime.check = max(sum.scaled.responsetime))
+```
+\pagebreak
+
+
+## Response Time Analysis ##
+In this section, we look at response times across varying complexity and containment levels.
+
+### Raw Response Time ###
+```{r analysis.resptime}
+title = "Response time across complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean response time (ms)"
+
+# Calculate means, CIs
+responsetime.means = data %>%
+  group_by(containment, complexity) %>%
+  summarize(means = mean(responsetime),
+            trials = n(),
+            se.lower = means - sqrt(var(responsetime) / length(responsetime)),
+            se.upper = means + sqrt(var(responsetime) / length(responsetime))) %>%
+  select(containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+make.canonical.bargraph(responsetime.means, title, xlab, ylab)
+```
+\pagebreak
+
+
+### Log Response Time ###
+```{r analysis.log.resptime}
+title = "Log response time across complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean log response time (log10 ms)"
+
+# Calculate means, CIs
+log.responsetime.means = data %>%
+  group_by(containment, complexity) %>%
+  summarize(means = mean(log.responsetime),
+            trials = n(),
+            se.lower = means - sqrt(var(log.responsetime) / length(log.responsetime)),
+            se.upper = means + sqrt(var(log.responsetime) / length(log.responsetime))) %>%
+  select(containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+log.responsetime.means %>%
+  ggplot(aes(x = complexity, y = means, ymin = se.lower, ymax = se.upper)) +
+  geom_pointrange() +
+  scale_x_discrete(labels = complexity_labels) +
+  facet_wrap(. ~ containment,
+             scales = "free_x",
+             labeller = labeller(containment = containment_labels)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title)
+```
+\pagebreak
+
+
+### Raw Response Time Scaled by Participant, Scenario Mean ###
+```{r analysis.scaled.resptime}
+title = "Response time scaled by scenario mean across complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean scaled response time (ms)"
+
+# Calculate means, CIs
+scaled.responsetime.means = data %>%
+  group_by(containment, complexity) %>%
+  summarize(means = mean(scaled.responsetime),
+            trials = n(),
+            se.lower = means - sqrt(var(scaled.responsetime) / length(scaled.responsetime)),
+            se.upper = means + sqrt(var(scaled.responsetime) / length(scaled.responsetime))) %>%
+  select(containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+make.canonical.bargraph(scaled.responsetime.means, title, xlab, ylab)
+```
+\pagebreak
+
+
+### Log Response Time Scaled by Participant, Scenario Mean ###
+```{r analysis.log.scaled.resptime}
+title = "Log response time scaled by scenario mean across complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean scaled log response time (log10 ms)"
+
+# Calculate means, CIs
+log.scaled.responsetime.means = data %>%
+  group_by(containment, complexity) %>%
+  summarize(means = mean(log.scaled.responsetime),
+            trials = n(),
+            se.lower = means - sqrt(var(log.scaled.responsetime) / length(log.scaled.responsetime)),
+            se.upper = means + sqrt(var(log.scaled.responsetime) / length(log.scaled.responsetime))) %>%
+  select(containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+make.canonical.bargraph(log.scaled.responsetime.means, title, xlab, ylab)
+```
+\pagebreak
+
+
+## Response Time Analysis by Scenario ##
+
+In this section, we look at response times across varying complexity and containment levels *for each scenario*.
+
+### Raw Response Time by Scenario ###
+```{r analysis.resptime.scenario}
+title = "Response time across scenarios by complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean response time (ms)"
+
+# Calculate means, CIs
+responsetime.scenario.means = data %>%
+  group_by(scenario, containment, complexity) %>%
+  summarize(means = mean(responsetime),
+            trials = n(),
+            se.lower = means - sqrt(var(responsetime) / length(responsetime)),
+            se.upper = means + sqrt(var(responsetime) / length(responsetime))) %>%
+  select(scenario, containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+make.canonical.bargraph.scenario(responsetime.scenario.means, title, xlab, ylab)
+```
+\pagebreak
+
+
+### Log Response Time by Scenario ###
+```{r analysis.log.resptime.scenario}
+title = "Log response time across scenarios by complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean response time (ms)"
+
+# Calculate means, CIs
+log.responsetime.scenario.means = data %>%
+  group_by(scenario, containment, complexity) %>%
+  summarize(means = mean(log.responsetime),
+            trials = n(),
+            se.lower = means - sqrt(var(log.responsetime) / length(log.responsetime)),
+            se.upper = means + sqrt(var(log.responsetime) / length(log.responsetime))) %>%
+  select(scenario, containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+log.responsetime.scenario.means %>%
+    ggplot(aes(x = complexity, y = means, ymin = se.lower, ymax = se.upper, color = scenario)) +
+    geom_pointrange() +
+    scale_x_discrete(labels = complexity_labels) +
+    guides(color = FALSE) +
+    facet_grid(scenario ~ containment,
+               scales = "free_x",
+               labeller = labeller(containment = containment_labels,
+                                   scenario = scenario_labels)) +
+    labs(x = xlab, y = ylab) +
+    ggtitle(title)
+```
+\pagebreak
+
+
+## Score Analysis ##
+In this section, we look at scores across varying complexity and containment levels.
+
+### Trial Score ###
+```{r analysis.score}
+title = "Trial scores across complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean score"
+
+# Calculate means, CIs
+score.means = data %>%
+  group_by(containment, complexity) %>%
+  summarize(means = mean(score),
+            trials = n(),
+            se.lower = means - sqrt(var(score) / length(score)),
+            se.upper = means + sqrt(var(score) / length(score))) %>%
+  select(containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+make.canonical.bargraph(score.means, title, xlab, ylab)
+```
+\pagebreak
+
+### Trial Score by Scenario ###
+```{r analysis.score.scenario}
+title = "Trial scores across scenarios by complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean trial score"
+
+# Calculate means, CIs
+score.scenario.means = data %>%
+  group_by(scenario, containment, complexity) %>%
+  summarize(means = mean(score),
+            trials = n(),
+            se.lower = means - sqrt(var(score) / length(score)),
+            se.upper = means + sqrt(var(score) / length(score))) %>%
+  select(scenario, containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+make.canonical.bargraph.scenario(score.scenario.means, title, xlab, ylab)
+```
+\pagebreak
+
+## Accuracy Analysis ##
+In this section, we look at participant accuracy across varying complexity and containment levels.
+
+### Trial Accuracy ###
+Calculating each participant's proportion of correct trials over each complexity and containment level (16 obs. per participant), below is mean accuracy across participants in each complexity and containment level.
+
+```{r analysis.accuracy}
+title = "Trial accuracy across complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean proportion correct across participants"
+
+# Calculate participant accuracy for each containment/complexity level
+participant.accuracy.means = data %>%
+  group_by(subjID, containment, complexity) %>%
+  summarize(right.answers = sum(correct),
+            total.answers = n(),
+            accuracy = right.answers / total.answers)
+
+# Calculate means, CIs
+accuracy.means = participant.accuracy.means %>%
+  group_by(containment, complexity) %>%
+  summarize(means = mean(accuracy),
+            trials = n(),
+            se.lower = means - sqrt(var(accuracy) / length(accuracy)),
+            se.upper = means + sqrt(var(accuracy) / length(accuracy))) %>%
+  select(containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+make.canonical.bargraph(accuracy.means, title, xlab, ylab)
+```
+\pagebreak
+
+
+### Trial Accuracy by Scenario ###
+Calculating each participant's proportion of correct trials across scenarios for each complexity and containment level (4 obs. per participant), below is mean accuracy for all participants.
+```{r analysis.accuracy.scenario}
+title = "Trial accuracy across scenarios by complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean proportion correct across participants"
+
+# Calculate participant accuracy in each scenario by containment, complexity level
+participant.scenario.accuracy.means = data %>%
+  group_by(subjID, scenario, containment, complexity) %>%
+  summarize(right.answers = sum(correct),
+            total.answers = n(),
+            accuracy = right.answers / total.answers)
+
+# Calculate means, CIs
+scenario.accuracy.means = participant.scenario.accuracy.means %>%
+  group_by(scenario, containment, complexity) %>%
+  summarize(means = mean(accuracy),
+            trials = n(),
+            se.lower = means - sqrt(var(accuracy) / length(accuracy)),
+            se.upper = means + sqrt(var(accuracy) / length(accuracy))) %>%
+  select(scenario, containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+make.canonical.bargraph.scenario(scenario.accuracy.means, title, xlab, ylab)
+```
+
