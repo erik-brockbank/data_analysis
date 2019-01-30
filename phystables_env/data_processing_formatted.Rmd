@@ -183,7 +183,7 @@ In the graph below, a smoothed view of the previous one, we see some signs of pa
 ```{r processing.resptime.individualtimeseries.smoothed}
 data %>%
   ggplot(aes(x = trialindex, y = log.responsetime, color = subjID)) +
-  geom_smooth(method = 'lm') +
+  geom_smooth(method = 'lm', se = FALSE) +
   theme(legend.position = "none") +
   labs(x = "Trial Number (1 - 256)",
        y = "Response time smoothed (log10 ms)",
