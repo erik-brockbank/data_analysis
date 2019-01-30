@@ -1,5 +1,5 @@
 # Script for reading in phystables_env data and processing/analyzing
-setwd("/Users/erikbrockbank/web/vullab/data_processing/phystables_env/")
+setwd("/Users/erikbrockbank/web/vullab/data_analysis/phystables_env/")
 
 library(tidyverse)
 
@@ -148,7 +148,7 @@ data %>%
 # TODO are people learning??
 data %>%
   ggplot(aes(x = trialindex, y = log.responsetime, color = subjID)) +
-  geom_smooth(method = 'lm') +
+  geom_smooth(method = 'lm', se = FALSE) +
   theme(legend.position = "none") +
   labs(x = "Trial Number (1 - 256)", y = "Response time (log10 ms)", color = "Participant")
 
@@ -206,6 +206,24 @@ make.canonical.bargraph.scenario = function(df.means, title, xlab, ylab) {
     ggtitle(title)
 }
 
+default.theme = theme(
+  # titles
+  plot.title = element_text(face = "bold", size = 18),
+  axis.title.y = element_text(face = "bold", size = 16),
+  axis.title.x = element_text(face = "bold", size = 16),
+  # axis text
+  axis.text.x = element_text(size = 12),
+  axis.text.y = element_text(size = 12),
+  # facet text
+  strip.text = element_text(size = 14),
+  # backgrounds, lines
+  panel.background = element_blank(),
+  strip.background = element_blank(),
+  
+  panel.grid = element_line(color = "gray"),
+  axis.line = element_line(color = "black")
+)
+
 
 
 ###############################
@@ -252,7 +270,7 @@ make.canonical.bargraph(responsetime.means, title, xlab, ylab)
 ### MEAN LOG RESPONSETIME ###
 title = "Log response time across complexity, containment levels"
 xlab = "Complexity level"
-ylab = "Mean log response time (log10 ms)"
+ylab = "Mean response time"
 
 # Calculate means, CIs
 log.responsetime.means = data %>%
@@ -263,25 +281,18 @@ log.responsetime.means = data %>%
             se.upper = means + sqrt(var(log.responsetime) / length(log.responsetime))) %>%
   select(containment, complexity, means, trials, se.lower, se.upper)
 # Graph data
+# response time dot plot (no canonical function for this because the scale_y is custom)
 log.responsetime.means %>%
   ggplot(aes(x = complexity, y = means, ymin = se.lower, ymax = se.upper)) +
   geom_pointrange() +
   scale_x_discrete(labels = complexity_labels) +
   facet_wrap(. ~ containment,
-             scales = "free_x",
+             scales = "free",
              labeller = labeller(containment = containment_labels)) +
+  scale_y_continuous(limits = c(2.4, 2.65), breaks = seq(2.4, 2.65, by = 0.1)) +
   labs(x = xlab, y = ylab) +
-  ggtitle(title)
-
-log.responsetime.means %>%
-  ggplot(aes(x = containment, y = means, ymin = se.lower, ymax = se.upper)) +
-  geom_pointrange() +
-  scale_x_discrete(labels = containment_labels) +
-  facet_wrap(. ~ complexity,
-             scales = "free_x",
-             labeller = labeller(complexity = complexity_labels)) +
-  labs(x = xlab, y = ylab) +
-  ggtitle(title)
+  ggtitle(title) +
+  default.theme
 
 
 
@@ -342,7 +353,7 @@ make.canonical.bargraph.scenario(responsetime.scenario.means, title, xlab, ylab)
 ### LOG RESPONSETIME BY SCENARIO ###
 title = "Log response time across scenarios by complexity, containment levels"
 xlab = "Complexity level"
-ylab = "Mean response time (ms)"
+ylab = "Mean response time"
 
 # Calculate means, CIs
 log.responsetime.scenario.means = data %>%
@@ -353,17 +364,22 @@ log.responsetime.scenario.means = data %>%
             se.upper = means + sqrt(var(log.responsetime) / length(log.responsetime))) %>%
   select(scenario, containment, complexity, means, trials, se.lower, se.upper)
 # Graph data
+# dot plot of log response time by scenario
+# no canonical function because scale_y is custom
 log.responsetime.scenario.means %>%
   ggplot(aes(x = complexity, y = means, ymin = se.lower, ymax = se.upper, color = scenario)) +
   geom_pointrange() +
   scale_x_discrete(labels = complexity_labels) +
   guides(color = FALSE) +
+  scale_y_continuous(limits = c(2.3, 2.7), breaks = seq(2.3, 2.7, by = 0.1)) +
   facet_grid(scenario ~ containment,
-             scales = "free_x",
+             scales = "free",
              labeller = labeller(containment = containment_labels,
                                  scenario = scenario_labels)) +
   labs(x = xlab, y = ylab) +
-  ggtitle(title)
+  ggtitle(title) +
+  default.theme
+
 
 #######################
 ### ANALYSIS: SCORE ###
@@ -410,7 +426,7 @@ make.canonical.bargraph.scenario(score.scenario.means, title, xlab, ylab)
 ### MEAN ACCURACY ###
 title = "Trial accuracy across complexity, containment levels"
 xlab = "Complexity level"
-ylab = "Mean proportion correct across participants"
+ylab = "Mean proportion correct"
 
 # Calculate participant accuracy for each containment/complexity level
 participant.accuracy.means = data %>%
@@ -430,13 +446,41 @@ accuracy.means = participant.accuracy.means %>%
             ci.upper = t.test(accuracy)$conf.int[2]) %>%
   select(containment, complexity, means, trials, se.lower, se.upper, ci.lower, ci.upper)
 # Graph data
-make.canonical.bargraph(accuracy.means, title, xlab, ylab)
+theme = theme(
+  # titles
+  plot.title = element_text(face = "bold", size = 20),
+  axis.title.y = element_text(face = "bold", size = 16),
+  axis.title.x = element_text(face = "bold", size = 16),
+  # axis text
+  axis.text.x = element_text(size = 12),
+  axis.text.y = element_text(size = 12),
+  # facet text
+  strip.text = element_text(size = 14),
+  # backgrounds, lines
+  panel.background = element_blank(),
+  strip.background = element_blank(),
+  
+  panel.grid = element_line(color = "gray"),
+  axis.line = element_line(color = "black")
+)
+# accuracy dotplot (no general expression for this because scale_y is unique)
+accuracy.means %>%
+  ggplot(aes(x = complexity, y = means, ymin = se.lower, ymax = se.upper)) +
+  geom_pointrange() +
+  scale_x_discrete(labels = complexity_labels) +
+  facet_wrap(. ~ containment,
+             scales = "free",
+             labeller = labeller(containment = containment_labels)) +
+  scale_y_continuous(limits = c(0.5, 1), breaks = seq(0, 1, by = 0.1)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  theme
 
 
 ### MEAN ACCURACY BY SCENARIO ###
 title = "Trial accuracy across scenarios by complexity, containment levels"
 xlab = "Complexity level"
-ylab = "Mean proportion correct across participants"
+ylab = "Mean proportion correct"
 
 # Calculate participant accuracy in each scenario by containment, complexity level
 participant.scenario.accuracy.means = data %>%
