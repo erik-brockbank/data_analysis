@@ -1,4 +1,5 @@
 # Script for reading in phystables_env data and processing/analyzing
+rm(list=ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/phystables_env/")
 
 library(tidyverse)
@@ -19,7 +20,7 @@ table(data.no.resp$subjID)
 
 data$responsetime[data$responsetime == -1] = 10 * 1000
 
-# TODO how to handle responsetime == 0?
+# Handle 0s responsetime trials by setting to 1s
 data.immediate.resp = data %>%
   filter(responsetime == 0)
 table(data.immediate.resp$subjID)
@@ -76,11 +77,6 @@ data %>%
   theme(legend.position = "bottom", axis.text.x = element_blank()) +
   labs(x = "Participant", y = "Response proportion (count 256)", fill = "Trial guess")
 
-# TODO should we eliminate these trials??
-no.resp.data = data %>%
-  filter(usertarget == "no response")
-table(no.resp.data$subjID)
-
 
 ### ACCURACY ###
 # participant count of correct guesses
@@ -99,7 +95,7 @@ low.accuracy = data %>%
             total.count = length(correct),
             correct.pct = correct.count / total.count) %>%
   filter(correct.pct < 0.5)
-
+low.accuracy
 
 ### SCORES ###
 # participant trial scores
@@ -208,19 +204,18 @@ make.canonical.bargraph.scenario = function(df.means, title, xlab, ylab) {
 
 default.theme = theme(
   # titles
-  plot.title = element_text(face = "bold", size = 18),
-  axis.title.y = element_text(face = "bold", size = 16),
-  axis.title.x = element_text(face = "bold", size = 16),
+  plot.title = element_text(face = "bold", size = 32),
+  axis.title.y = element_text(face = "bold", size = 32),
+  axis.title.x = element_text(face = "bold", size = 32),
   # axis text
-  axis.text.x = element_text(size = 12),
-  axis.text.y = element_text(size = 12),
+  axis.text.x = element_text(size = 24),
+  axis.text.y = element_text(size = 20),
   # facet text
-  strip.text = element_text(size = 14),
+  strip.text = element_text(size = 28),
   # backgrounds, lines
   panel.background = element_blank(),
   strip.background = element_blank(),
-  
-  panel.grid = element_line(color = "gray"),
+  panel.grid = element_blank(),
   axis.line = element_line(color = "black")
 )
 
@@ -252,7 +247,7 @@ data %>%
 
 ### MEAN RESPONSETIME ###
 title = "Response time across complexity, containment levels"
-xlab = "Complexity level"
+xlab = "Simulation complexity"
 ylab = "Mean response time (ms)"
 
 # Calculate means, CIs
@@ -265,6 +260,20 @@ responsetime.means = data %>%
   select(containment, complexity, means, trials, se.lower, se.upper)
 # Graph data
 make.canonical.bargraph(responsetime.means, title, xlab, ylab)
+
+# Graph as dot with errors
+responsetime.means %>%
+  ggplot(aes(x = complexity, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  scale_x_discrete(labels = complexity_labels) +
+  facet_wrap(. ~ containment,
+             scales = "free",
+             labeller = labeller(containment = containment_labels)) +
+  scale_y_continuous(limits = c(250, 750), breaks = seq(250, 750, by = 250)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
 
 
 ### MEAN LOG RESPONSETIME ###
@@ -284,12 +293,12 @@ log.responsetime.means = data %>%
 # response time dot plot (no canonical function for this because the scale_y is custom)
 log.responsetime.means %>%
   ggplot(aes(x = complexity, y = means, ymin = se.lower, ymax = se.upper)) +
-  geom_pointrange() +
+  geom_pointrange(size = 1) +
   scale_x_discrete(labels = complexity_labels) +
   facet_wrap(. ~ containment,
              scales = "free",
              labeller = labeller(containment = containment_labels)) +
-  scale_y_continuous(limits = c(2.4, 2.65), breaks = seq(2.4, 2.65, by = 0.1)) +
+  scale_y_continuous(limits = c(2.3, 2.6), breaks = seq(2.3, 2.6, by = 0.1)) +
   labs(x = xlab, y = ylab) +
   ggtitle(title) +
   default.theme
@@ -336,7 +345,7 @@ make.canonical.bargraph(log.scaled.responsetime.means, title, xlab, ylab)
 
 ### MEAN RESPONSETIME BY SCENARIO ###
 title = "Response time across scenarios by complexity, containment levels"
-xlab = "Complexity level"
+xlab = "Simulation complexity"
 ylab = "Mean response time (ms)"
 
 # Calculate means, CIs
@@ -350,11 +359,33 @@ responsetime.scenario.means = data %>%
 # Graph data
 make.canonical.bargraph.scenario(responsetime.scenario.means, title, xlab, ylab)
 
+# Graph as points with errorbar
+scen.theme = default.theme
+scen.theme$panel.border = element_rect(colour = "black", fill = NA, size = 1)
+
+responsetime.scenario.means %>%
+  ggplot(aes(x = complexity, y = means, color = scenario)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.5) +
+  scale_x_discrete(labels = complexity_labels) +
+  guides(color = FALSE) +
+  scale_y_continuous(limits = c(300, 900), breaks = seq(300, 900, by = 200)) +
+  facet_grid(scenario ~ containment,
+             scales = "free",
+             labeller = labeller(containment = containment_labels,
+                                 scenario = scenario_labels)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  scen.theme
+
+
 ### LOG RESPONSETIME BY SCENARIO ###
-title = "Log response time across scenarios by complexity, containment levels"
+title = "Log response time across scenarios"
 xlab = "Complexity level"
 ylab = "Mean response time"
 
+scen.theme = default.theme
+scen.theme$panel.border = element_rect(colour = "black", fill = NA, size = 1)
 # Calculate means, CIs
 log.responsetime.scenario.means = data %>%
   group_by(scenario, containment, complexity) %>%
@@ -378,7 +409,9 @@ log.responsetime.scenario.means %>%
                                  scenario = scenario_labels)) +
   labs(x = xlab, y = ylab) +
   ggtitle(title) +
-  default.theme
+  scen.theme
+
+
 
 
 #######################
@@ -425,7 +458,7 @@ make.canonical.bargraph.scenario(score.scenario.means, title, xlab, ylab)
 
 ### MEAN ACCURACY ###
 title = "Trial accuracy across complexity, containment levels"
-xlab = "Complexity level"
+xlab = "Simulation complexity"
 ylab = "Mean proportion correct"
 
 # Calculate participant accuracy for each containment/complexity level
@@ -446,27 +479,10 @@ accuracy.means = participant.accuracy.means %>%
             ci.upper = t.test(accuracy)$conf.int[2]) %>%
   select(containment, complexity, means, trials, se.lower, se.upper, ci.lower, ci.upper)
 # Graph data
-theme = theme(
-  # titles
-  plot.title = element_text(face = "bold", size = 20),
-  axis.title.y = element_text(face = "bold", size = 16),
-  axis.title.x = element_text(face = "bold", size = 16),
-  # axis text
-  axis.text.x = element_text(size = 12),
-  axis.text.y = element_text(size = 12),
-  # facet text
-  strip.text = element_text(size = 14),
-  # backgrounds, lines
-  panel.background = element_blank(),
-  strip.background = element_blank(),
-  
-  panel.grid = element_line(color = "gray"),
-  axis.line = element_line(color = "black")
-)
 # accuracy dotplot (no general expression for this because scale_y is unique)
 accuracy.means %>%
   ggplot(aes(x = complexity, y = means, ymin = se.lower, ymax = se.upper)) +
-  geom_pointrange() +
+  geom_pointrange(size = 1) +
   scale_x_discrete(labels = complexity_labels) +
   facet_wrap(. ~ containment,
              scales = "free",
@@ -474,7 +490,22 @@ accuracy.means %>%
   scale_y_continuous(limits = c(0.5, 1), breaks = seq(0, 1, by = 0.1)) +
   labs(x = xlab, y = ylab) +
   ggtitle(title) +
-  theme
+  default.theme
+
+# Graph with standard error bars
+accuracy.means %>%
+  ggplot(aes(x = complexity, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  scale_x_discrete(labels = complexity_labels) +
+  geom_hline(aes(yintercept = 0.5), linetype = "dashed") +
+  facet_wrap(. ~ containment,
+             scales = "free",
+             labeller = labeller(containment = containment_labels)) +
+  scale_y_continuous(limits = c(0.5, 1), breaks = seq(0, 1, by = 0.1)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
 
 
 ### MEAN ACCURACY BY SCENARIO ###
@@ -501,8 +532,24 @@ scenario.accuracy.means = participant.scenario.accuracy.means %>%
 make.canonical.bargraph.scenario(scenario.accuracy.means, title, xlab, ylab)
 
 
+#########################
+### ANALYSIS: BOUNCES ###
+#########################
+
+bounces.means = data %>%
+  group_by(containment, complexity) %>%
+  summarize(means = mean(numbounces),
+            trials = n(),
+            se.lower = means - sqrt(var(numbounces) / length(numbounces)),
+            se.upper = means + sqrt(var(numbounces) / length(numbounces))) %>%
+  select(containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+make.canonical.bargraph(bounces.means, "Bounces", xlab, "Number of Bounces")
+
+
+
 ###########################
-### SIMULATION ANALYSIS ###
+### STATISTICS!!!!!!!!! ###
 ###########################
 
 data = data %>%
@@ -516,47 +563,90 @@ data %>%
   ggplot(aes(x = log.simtime, y = log.scaled.responsetime)) +
   geom_point()
 
-
 cor.test(data$log.simtime, data$log.responsetime)
 cor.test(data$log.simtime, data$log.scaled.responsetime)
 
 glimpse(data)
 
-# For some reason this breaks everything
+
+
+### ANOVAS ###
+
+# This takes ~ 2s
+model.scenario = with(data, aov(log.responsetime ~ scenario + Error(subjID / scenario)))
+summary(model.scenario)
+#' Summary: 
+#' scenario accounts for significant variance, F(3,234) = 64.89, p < 2e-16
+
+# This takes ~ 10s
+model.containment.complexity = with(data, aov(log.responsetime ~ containment * complexity + Error(subjID / (containment * complexity))))
+summary(model.containment.complexity)
+#' Summary: 
+#' containment accounts for significant variance, F(2,156) = 55.63, p < 2e-16
+#' complexity accounts for significant variance, F(3,234) = 8.87, p = 1.37e-05
+#' interaction is not significant, F(6,468) = 0.487, p = 0.818
+
+# This takes 3-4 mins
+model.containment.complexity.rotation = with(data, aov(log.responsetime ~ containment * complexity * rotation + Error(subjID / (containment * complexity * rotation))))
+summary(model.containment.complexity.rotation)
+#' Summary:
+#' containment accounts for significant variance, F(2,156) = 55.63, p < 2e-16
+#' complexity accounts for significant variance, F(3,234) = 8.87, p = 1.37e-05
+#' rotation accounts for significant variance, F(3,234) = 6.995, p = 0.000159
+#' None of the interactions are significant (containment:complexity, containment:rotation, complexity:rotation, containment:complexity:rotation)
+
+# This takes 3-4 mins
+model.containment.complexity.scenario = with(data, aov(log.responsetime ~ scenario * containment * complexity + Error(subjID / (scenario * containment * complexity))))
+summary(model.containment.complexity.scenario)
+#' Summary:
+#' containment accounts for significant variance, F(2,156) = 55.63, p < 2e-16
+#' complexity accounts for significant variance, F(3,234) = 8.87, p = 1.37e-05
+#' scenario accounts for significant variance, F(3,234) = 64.89, p < 2e-16
+#' containment:complexity interaction is not significant, F(6,468) = 0.487, p = 0.818
+#' containment:scenario interaction is highly significant, F(6,468) = 6.935, p = 4.49e-07
+#' complexity:scenario interaction is highly significant, F(9,702) = 4.662, p = 5.11e-06
+#' containment:complexity:scenario interaction is significant, F(18,1404) = 1.626, p = 0.0467
+
+
+# This takes 4-5 mins
+model.full.additive = with(data, aov(log.responsetime ~ containment * complexity * scenario + rotation + Error(subjID / (containment * complexity * scenario + rotation))))
+summary(model.full.additive)
+# Same as above
+
+
+# Make sure there's nothing going on with containment/complexity and rotation
+model.containment.complexity.rotation = with(data, aov(log.responsetime ~ containment * complexity * rotation + Error(subjID / (containment * complexity * rotation))))
+summary(model.containment.complexity.rotation)
+#' Summary: there isn't (interaction terms not significant)
+
+
+# Make sure there's nothing going on with scenario:rotation
+# This takes < 1 min
+model.scenario.rotation = with(data, aov(log.responsetime ~ scenario * rotation + Error(subjID / (scenario * rotation))))
+summary(model.scenario.rotation)
+#' scenario and rotation are highly significant (see above)
+#' scenario:rotation interaction is significant, F(9,702) = 2.939, p = 0.00197
+
+
+
+### ACCURACY ###
+
+accuracy.containment.complexity = with(participant.accuracy.means, aov(accuracy ~ containment * complexity + Error(subjID / (containment * complexity))))
+summary(accuracy.containment.complexity)
+#' Summary: 
+#' containment accounts for significant variance, F(2,156) = 829.5, p < 2e-16
+#' complexity accounts for significant variance, F(3,234) = 15.7, p = 2.46e-09
+#' interaction is not significant, F(6,468) = 61.79, p <2e-16
+
+
+
+# For some reason this breaks everything, too slow
 model.basic = with(data, aov(log.responsetime ~ scenario * containment * complexity * rotation + 
                  Error(subjID / (scenario * containment * complexity * rotation))))
 
 
 
-participant.accuracy.means = data %>%
-  group_by(subjID, containment, complexity) %>%
-  summarize(right.answers = sum(correct),
-            total.answers = n(),
-            accuracy = right.answers / total.answers,
-            responsetime.mean = mean(responsetime),
-            log.responsetime.mean = mean(log.responsetime))
 
-
-participant.accuracy.means %>%
-  ggplot(aes(x = log.responsetime.mean, y = accuracy, color = containment)) +
-  geom_jitter()
-
-participant.accuracy.means %>%
-  ggplot(aes(x = log.responsetime.mean, y = accuracy, color = complexity)) +
-  geom_jitter()
-
-
-
-
-bounces.means = data %>%
-  group_by(containment, complexity) %>%
-  summarize(means = mean(numbounces),
-            trials = n(),
-            se.lower = means - sqrt(var(numbounces) / length(numbounces)),
-            se.upper = means + sqrt(var(numbounces) / length(numbounces))) %>%
-  select(containment, complexity, means, trials, se.lower, se.upper)
-# Graph data
-make.canonical.bargraph(bounces.means, "Bounces", xlab, "Number of Bounces")
 
 
 
@@ -700,5 +790,234 @@ make.canonical.bargraph.scenario(bounce.scenario.means, title, xlab, ylab)
 
 
 
+#################################
+### ANALYSIS: STRATEGY CHANGE ###
+#################################
+
+#' First, we look at responsetime and accuracy by quartile across *all* containment/complexity levels
+#' 1. Response time drops precipitously in the first quartile and stays low
+#' 2. Accuracy stays very consistent across all quartiles so participants were at best more *efficient* overall
+
+
+### RESPONSETIME ###
+
+# Responsetime by quartile, all trials
+trial.order.qtrs = data %>%
+  mutate(trial.quartile = ceiling(trialindex / 64)) %>%
+  group_by(trial.quartile) %>%
+  summarize(means = mean(responsetime),
+            trials = n(),
+            se.lower = means - sqrt(var(responsetime) / length(responsetime)),
+            se.upper = means + sqrt(var(responsetime) / length(responsetime))) %>%
+  select(trial.quartile, means, trials, se.lower, se.upper)
+
+title = "Response time by trial order quartile"
+xlab = "Quartile of trial order"
+ylab = "Mean response time (ms)"
+
+trial.order.qtrs %>%
+  ggplot(aes(x = trial.quartile, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
+
+
+# Responsetime by trial index, all trials
+trial.order.means = data %>%
+  group_by(trialindex) %>%
+  summarize(means = mean(responsetime),
+            trials = n(),
+            se.lower = means - sqrt(var(responsetime) / length(responsetime)),
+            se.upper = means + sqrt(var(responsetime) / length(responsetime))) %>%
+  select(trialindex, means, trials, se.lower, se.upper)
+
+title = "Response time by trial index"
+xlab = "Trial index"
+ylab = "Mean response time (ms)"
+
+trial.order.means %>%
+  ggplot(aes(x = trialindex, y = means)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
+
+
+### ACCURACY ###
+
+# Accuracy by subject x quartile, all trials
+trialindex.accuracy.qtrs = data %>%
+  mutate(trial.quartile = ceiling(trialindex / 64)) %>%
+  group_by(trial.quartile, subjID) %>%
+  summarize(right.answers = sum(correct),
+            total.answers = n(),
+            accuracy = right.answers / total.answers)
+
+trialindex.accuracy.summary.qtrs = trialindex.accuracy.qtrs %>%
+  group_by(trial.quartile) %>%
+  summarize(means = mean(accuracy),
+            trials = n(),
+            se.lower = means - sqrt(var(accuracy) / length(accuracy)),
+            se.upper = means + sqrt(var(accuracy) / length(accuracy))) %>%
+  select(trial.quartile, means, trials, se.lower, se.upper)
+
+title = "Participant accuracy by trial order quartile"
+xlab = "Quartile of trial order"
+ylab = "Percent correct"
+
+trialindex.accuracy.summary.qtrs %>%
+  ggplot(aes(x = trial.quartile, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  scale_y_continuous(limits = c(0.5, 1.0)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
+
+
+# Accuracy by trialindex, all trials
+trialindex.accuracy.means = data %>%
+  group_by(trialindex) %>%
+  summarize(right.answers = sum(correct),
+            total.answers = n(),
+            accuracy = right.answers / total.answers)
+
+title = "Accuracy by trial index"
+xlab = "Trial index"
+ylab = "Percent correct"
+
+trialindex.accuracy.means %>%
+  ggplot(aes(x = trialindex, y = accuracy)) +
+  geom_point() +
+  labs(x = xlab, y = ylab) +
+  scale_y_continuous(limits = c(0.5, 1.0)) +
+  ggtitle(title) +
+  default.theme
+
+
+#' Next, we look at responsetime and accuracy by quartile for *only* high containment, high complexity trials
+#' 1. Unlike across all trials, response time drops more gradually, looking very linear by quartiles
+#' 2. Accuracy decreases slightly from 0.575 to 0.525
+#' 
+
+
+
+### PROCESS DATA ###
+# Check data
+glimpse(data)
+levels(as.factor(data$complexity))
+levels(as.factor(data$containment))
+
+# Select just high complexity high containmnet trials
+complex.trials = data %>%
+  filter(complexity == "l4", containment == "l3")
+glimpse(complex.trials) # drops down to 1264 observations
+table(complex.trials$subjID) # 16 high complexity/high containment trials per subject (4 scenario x 4 rotation)
+
+# Split into ordinal quartiles
+complex.trials = complex.trials %>%
+  group_by(subjID) %>%
+  mutate(trial.order = rank(trialindex), # get ordinal rank of each high comp. high cont. trial
+         trial.quartile = ceiling(trial.order / 4)) # get quartile for each trial
+
+# Check that it works
+complex.trials %>%
+  filter(subjID == "user_1548457510128") %>% # "user_1548179758602"
+  select(trialname, trialindex, trial.order, trial.quartile)
+
+
+### RESPONSETIME ### 
+
+# Mean responsetime by quartile
+title = "High containment, high complexity response time"
+xlab = "Quartile of trial order"
+ylab = "Mean response time (ms)"
+
+complex.responsetime.qtrs = complex.trials %>%
+  group_by(trial.quartile) %>%
+  summarize(means = mean(responsetime),
+            trials = n(),
+            se.lower = means - sqrt(var(responsetime) / length(responsetime)),
+            se.upper = means + sqrt(var(responsetime) / length(responsetime))) %>%
+  select(trial.quartile, means, trials, se.lower, se.upper)
+
+complex.responsetime.qtrs %>%
+  ggplot(aes(x = trial.quartile, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
+
+
+# Mean responsetime by trial order (more continuous than quartile)
+xlab = "Trial order"
+
+complex.responsetime.means = complex.trials %>%
+  group_by(trial.order) %>%
+  summarize(means = mean(responsetime),
+            trials = n(),
+            se.lower = means - sqrt(var(responsetime) / length(responsetime)),
+            se.upper = means + sqrt(var(responsetime) / length(responsetime))) %>%
+  select(trial.order, means, trials, se.lower, se.upper)
+
+complex.responsetime.means %>%
+  ggplot(aes(x = trial.order, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
+
+
+### ACCURACY ### 
+
+# Accuracy by subject x quartile
+complex.accuracy.qtrs = complex.trials %>%
+  group_by(trial.quartile, subjID) %>%
+  summarize(right.answers = sum(correct),
+            total.answers = n(),
+            accuracy = right.answers / total.answers)
+
+complex.accuracy.summary.qtrs = complex.accuracy.qtrs %>%
+  group_by(trial.quartile) %>%
+  summarize(means = mean(accuracy),
+            trials = n(),
+            se.lower = means - sqrt(var(accuracy) / length(accuracy)),
+            se.upper = means + sqrt(var(accuracy) / length(accuracy))) %>%
+  select(trial.quartile, means, trials, se.lower, se.upper)
+
+
+title = "High containment, high complexity accuracy"
+xlab = "Quartile of trial order"
+ylab = "Mean proportion correct"
+
+complex.accuracy.summary.qtrs %>%
+  ggplot(aes(x = trial.quartile, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  geom_hline(aes(yintercept = 0.5), linetype = "dashed") +
+  scale_y_continuous(limits = c(0.4, 0.6)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
+
+
+### ANOVAS ###
+model.quartile.resp = with(complex.trials, aov(log.responsetime ~ trial.quartile + Error(subjID / (trial.quartile))))
+summary(model.quartile.resp) # trial.quartile explains significant variance in response time
+
+model.quartile.acc = with(complex.accuracy.qtrs, aov(accuracy ~ trial.quartile + Error(subjID / (trial.quartile))))
+summary(model.quartile.acc)
+
+
+### SCRATCHPAD ### 
+
+data %>%
+  ggplot(aes(x = responsetime, y = score)) +
+  geom_point()
 
 
