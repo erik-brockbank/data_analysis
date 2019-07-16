@@ -220,6 +220,40 @@ default.theme = theme(
 )
 
 
+#################################
+### ANALYSIS: SIMULATION TIME ###
+#################################
+### Mean time for the ball to execute rest of path after participant answer ###
+title = "Ball movement time across complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean movement time (ms)"
+
+# Calculate means, CIs
+simulation.time.means = data %>%
+  group_by(containment, complexity) %>%
+  summarize(means = mean(simtime),
+            trials = n(),
+            se.lower = means - sqrt(var(simtime) / length(simtime)),
+            se.upper = means + sqrt(var(simtime) / length(simtime))) %>%
+  select(containment, complexity, means, trials, se.lower, se.upper)
+# Graph data
+make.canonical.bargraph(simulation.time.means, title, xlab, ylab)
+
+# Graph as dot with errors
+simulation.time.means %>%
+  ggplot(aes(x = complexity, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  scale_x_discrete(labels = complexity_labels) +
+  facet_wrap(. ~ containment,
+             scales = "free",
+             labeller = labeller(containment = containment_labels)) +
+  #scale_y_continuous(limits = c(250, 750), breaks = seq(250, 750, by = 250)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
+
+
 
 ###############################
 ### ANALYSIS: RESPONSE TIME ###
@@ -272,7 +306,7 @@ responsetime.means %>%
              labeller = labeller(containment = containment_labels)) +
   scale_y_continuous(limits = c(250, 750), breaks = seq(250, 750, by = 250)) +
   labs(x = xlab, y = ylab) +
-  ggtitle(title) +
+  #ggtitle(title) +
   default.theme
 
 
@@ -536,6 +570,10 @@ make.canonical.bargraph.scenario(scenario.accuracy.means, title, xlab, ylab)
 ### ANALYSIS: BOUNCES ###
 #########################
 
+title = "Number of bounces across complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean number of bounces"
+
 bounces.means = data %>%
   group_by(containment, complexity) %>%
   summarize(means = mean(numbounces),
@@ -546,6 +584,18 @@ bounces.means = data %>%
 # Graph data
 make.canonical.bargraph(bounces.means, "Bounces", xlab, "Number of Bounces")
 
+bounces.means %>%
+  ggplot(aes(x = complexity, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  scale_x_discrete(labels = complexity_labels) +
+  facet_wrap(. ~ containment,
+             scales = "free",
+             labeller = labeller(containment = containment_labels)) +
+  scale_y_continuous(limits = c(0, 25), breaks = seq(0, 25, by = 5)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
 
 
 ###########################
@@ -702,6 +752,18 @@ simtime.means = sim.data %>%
 # Graph data
 make.canonical.bargraph(simtime.means, title, xlab, ylab)
 
+simtime.means %>%
+  ggplot(aes(x = complexity, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  scale_x_discrete(labels = complexity_labels) +
+  facet_wrap(. ~ containment,
+             scales = "free",
+             labeller = labeller(containment = containment_labels)) +
+  #scale_y_continuous(limits = c(0, 20), breaks = seq(0, 20, by = 5)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
 
 ### LOG SIMTIME ### 
 title = "Log simulation times across complexity, containment levels"
@@ -1006,7 +1068,34 @@ complex.accuracy.summary.qtrs %>%
   default.theme
 
 
+# did anybody figure it out?
+complex.accuracy.qtrs %>%
+  filter(accuracy == 1)
+
+complex.accuray.qtrs[complex.accuracy.qtrs$accuracy[complex.accuracy.qtrs$trial.quartile == 4] == 1,]
+
+complex.accuracy.qtrs %>%
+  filter(accuracy == 1) %>%
+  ggplot(aes(x = trial.quartile, y = accuracy, color = subjID)) +
+  geom_line(alpha = 0.25) +
+  theme(legend.position = "none")
+
+
 ### ANOVAS ###
+subset.data.q1 = complex.trials$correct[complex.trials$trial.quartile == 1]
+subset.data.q4 = complex.trials$correct[complex.trials$trial.quartile == 4]
+
+binom.test(x = sum(subset.data.q1),
+              n = length(subset.data.q1),
+              p = 0.5)
+
+binom.test(x = sum(subset.data.q4),
+           n = length(subset.data.q4),
+           p = 0.5)
+
+
+
+
 model.quartile.resp = with(complex.trials, aov(log.responsetime ~ trial.quartile + Error(subjID / (trial.quartile))))
 summary(model.quartile.resp) # trial.quartile explains significant variance in response time
 
