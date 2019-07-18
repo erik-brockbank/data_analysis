@@ -2,7 +2,7 @@
 
 rm(list=ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/phystables_env/")
-
+library(tidyverse)
 
 # Set levels and labels for containment, complexity data (should align with real data graphs)
 containment.levels = c(1, 2, 3)
@@ -31,14 +31,14 @@ data.template = data.frame(
 # Graph theme copied over from analysis script `data_processing.R`
 default.theme = theme(
   # titles
-  plot.title = element_text(face = "bold", size = 32),
-  axis.title.y = element_text(face = "bold", size = 32),
-  axis.title.x = element_text(face = "bold", size = 32),
+  plot.title = element_text(face = "bold", size = 64, hjust = 0.5),
+  axis.title.y = element_text(face = "bold", size = 48),
+  axis.title.x = element_text(face = "bold", size = 48),
   # axis text
-  axis.text.x = element_text(size = 24),
-  axis.text.y = element_text(size = 20),
+  axis.text.y = element_blank(),
+  axis.text.x = element_text(face = "bold", size = 24, vjust = 0.65, hjust = 0.5, angle = 45),
   # facet text
-  strip.text = element_text(size = 28),
+  strip.text = element_text(face = "bold", size = 36),
   # backgrounds, lines
   panel.background = element_blank(),
   strip.background = element_blank(),
@@ -52,10 +52,12 @@ default.theme = theme(
 data.sim = data.template
 increment = 250 # ms used as starting point, will not be displayed numerically
 for (containment in containment.levels) {
-  min.rt = match(containment, containment.levels) * increment
-  max.rt = match(containment, containment.levels) * increment + length(complexity.levels) * increment
+  # min.rt = match(containment, containment.levels) * increment
+  min.rt = increment
+  # max.rt = match(containment, containment.levels) * increment + length(complexity.levels) * increment
+  max.rt = length(complexity.levels) * increment
   rt.vals = seq(from = min.rt,
-                to = max.rt - 1,
+                to = max.rt,
                 by = increment)
   data.sim = rbind(data.sim, data.frame(containment = containment,
                                         complexity = complexity.levels,
@@ -69,13 +71,13 @@ data.sim %>%
   scale_x_continuous(labels = complexity.labels) +
   facet_wrap(.~containment,
              scales = "free",
-             labeller = labeller(containment = containment.labels)) +
-  scale_y_continuous(limits = c(0, 2000), breaks = seq(0, 2000, by = 500)) +
-  labs(x = "Simulation complexity", y = "Mean response time (ms)") +
-  #ggtitle("Response time across complexity, containment levels") +
+             labeller = labeller(containment = containment.labels),
+             strip.position = "right") +
+  scale_y_continuous(limits = c(0, 1250), breaks = seq(0, 1250, by = increment)) +
+  labs(x = "", y = "RT") +
+  ggtitle("Simulation only") +
   default.theme +
-  theme(axis.text.y = element_blank(),
-        axis.text.x = element_text(vjust = 0.65, hjust = 0.5, angle = 45))
+  theme()
 
 
 
@@ -84,11 +86,12 @@ data.sim %>%
 data.top = data.template
 increment = 250 # ms used as starting point, will not be displayed numerically
 for (containment in containment.levels) {
-  min.rt = (length(containment) + 1 - match(containment, containment.levels)) * increment
-  max.rt = (length(containment) + 1 - match(containment, containment.levels)) * increment + length(complexity.levels) * increment
-  rt.vals = seq(from = max.rt,
-                to = min.rt + 1,
-                by = -increment)
+  # min.rt = (length(containment) + 1 - match(containment, containment.levels)) * increment
+  # max.rt = (length(containment) + 1 - match(containment, containment.levels)) * increment + length(complexity.levels) * increment
+  rt.level = (length(containment.levels) + 1 - match(containment, containment.levels)) * increment
+  rt.vals = seq(from = rt.level,
+                to = rt.level + 1,
+                by = increment)
   data.top = rbind(data.top, data.frame(containment = containment,
                                         complexity = complexity.levels,
                                         response.time = rt.vals))
@@ -101,30 +104,31 @@ data.top %>%
   scale_x_continuous(labels = complexity.labels) +
   facet_wrap(.~containment,
              scales = "free",
-             labeller = labeller(containment = containment.labels)) +
-  scale_y_continuous(limits = c(0, 2000), breaks = seq(0, 2000, by = 500)) +
-  labs(x = "Simulation complexity", y = "Mean response time (ms)") +
-  #ggtitle("Response time across complexity, containment levels") +
-  default.theme +
-  theme(axis.text.y = element_blank(),
-        axis.text.x = element_text(vjust = 0.65, hjust = 0.5, angle = 45))
+             labeller = labeller(containment = containment.labels),
+             strip.position = "right") +
+  scale_y_continuous(limits = c(0, 1000), breaks = seq(0, 1000, by = increment)) +
+  labs(x = "", y = "RT") +
+  ggtitle("Topology only") +
+  default.theme
 
 
 ### PREDICTIONS: META-REASONING ###
 data.meta = data.template
 increment = 250 # ms used as starting point, will not be displayed numerically
 for (containment in containment.levels) {
-  min.rt = match(containment, containment.levels) * increment
-  max.rt = match(containment, containment.levels) * increment + length(complexity.levels) * increment
+  # min.rt = match(containment, containment.levels) * increment
+  min.rt = increment
+  # max.rt = match(containment, containment.levels) * increment + length(complexity.levels) * increment
+  max.rt = length(complexity.levels) * increment
   rt.vals = seq(from = min.rt,
-                to = max.rt - 1,
+                to = max.rt + 1,
                 by = increment)
-  if (match(containment, containment.levels) == length(containment.levels) -1) {
-    rt.vals[4] = rt.vals[3] - 100
+  if (match(containment, containment.levels) == length(containment.levels) - 1) {
+    rt.vals[4] = rt.vals[3]
   }
   if (match(containment, containment.levels) == length(containment.levels)) {
-    rt.vals[3] = rt.vals[3] - 200
-    rt.vals[4] = rt.vals[2] - 200
+    rt.vals[3] = rt.vals[2]
+    rt.vals[4] = rt.vals[2]
   }
   data.meta = rbind(data.meta, data.frame(containment = containment,
                                         complexity = complexity.levels,
@@ -138,13 +142,13 @@ data.meta %>%
   scale_x_continuous(labels = complexity.labels) +
   facet_wrap(.~containment,
              scales = "free",
-             labeller = labeller(containment = containment.labels)) +
-  scale_y_continuous(limits = c(0, 2000), breaks = seq(0, 2000, by = 500)) +
-  labs(x = "Simulation complexity", y = "Mean response time (ms)") +
-  #ggtitle("Response time across complexity, containment levels") +
+             labeller = labeller(containment = containment.labels),
+             strip.position = "right") +
+  scale_y_continuous(limits = c(0, 1250), breaks = seq(0, 1250, by = increment)) +
+  labs(x = "Simulation complexity", y = "RT") +
+  ggtitle("Flexible reasoning") +
   default.theme +
-  theme(axis.text.y = element_blank(),
-        axis.text.x = element_text(vjust = 0.65, hjust = 0.5, angle = 45))
+  theme()
 
 
 
