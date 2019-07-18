@@ -205,13 +205,13 @@ make.canonical.bargraph.scenario = function(df.means, title, xlab, ylab) {
 default.theme = theme(
   # titles
   plot.title = element_text(face = "bold", size = 32),
-  axis.title.y = element_text(face = "bold", size = 32),
-  axis.title.x = element_text(face = "bold", size = 32),
+  axis.title.y = element_text(face = "bold", size = 36),
+  axis.title.x = element_text(face = "bold", size = 36),
   # axis text
   axis.text.x = element_text(size = 24),
   axis.text.y = element_text(size = 20),
   # facet text
-  strip.text = element_text(size = 28),
+  strip.text = element_text(face = "bold", size = 28),
   # backgrounds, lines
   panel.background = element_blank(),
   strip.background = element_blank(),
@@ -409,7 +409,7 @@ responsetime.scenario.means %>%
              labeller = labeller(containment = containment_labels,
                                  scenario = scenario_labels)) +
   labs(x = xlab, y = ylab) +
-  ggtitle(title) +
+  #ggtitle(title) +
   scen.theme
 
 
@@ -538,7 +538,7 @@ accuracy.means %>%
              labeller = labeller(containment = containment_labels)) +
   scale_y_continuous(limits = c(0.5, 1), breaks = seq(0, 1, by = 0.1)) +
   labs(x = xlab, y = ylab) +
-  ggtitle(title) +
+  #ggtitle(title) +
   default.theme
 
 
@@ -1064,7 +1064,7 @@ complex.accuracy.summary.qtrs %>%
   geom_hline(aes(yintercept = 0.5), linetype = "dashed") +
   scale_y_continuous(limits = c(0.4, 0.6)) +
   labs(x = xlab, y = ylab) +
-  ggtitle(title) +
+  #ggtitle(title) +
   default.theme
 
 
