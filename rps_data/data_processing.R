@@ -116,7 +116,7 @@ plot.moves = function(data) {
     ggtitle("Move percentage by participant") +
     individ_plot_theme +
     theme(strip.text = element_blank()) +
-    facet_wrap(~player_id, scales = "free_y", ncol = 2)
+    facet_wrap(~player_id, scales = "free_y", ncol = 3)
 }
 
 # Check that no player did so terribly that we should be suspicious of whether they were trying
@@ -128,9 +128,11 @@ plot.scores = function(data) {
     mutate(final_score = player_total + player_points) %>%
     select(player_id, final_score)
   
+  print(score.summary)
+  
   score.summary %>%
     ggplot(aes(x = final_score)) +
-    geom_histogram(binwidth = 10) +
+    geom_histogram(binwidth = 20) +
     labs(x = "Participant scores") +
     ggtitle("Distribution of participant final scores") +
     individ_plot_theme
@@ -154,7 +156,7 @@ table(data$player_id)
 # Plot RT distributions
 plot.rt(data)
 # Manually view the lowest RTs across participants
-sort(data$player_rt)[1:25]
+sort(data$player_rt)[1:50] # we have some very low RTs...
 
 
 ### Move choices ###
@@ -162,7 +164,9 @@ plot.moves(data)
 
 
 ### Scores ###
-plot.scores(data) # max: 300, min: -100, expected: 66
+plot.scores(data) 
+# for 100 rounds, max: 300; min: -100; expected: 66
+# for 300 rounds, max: 900; min: -300; expected: 200
 
 
 # TODO
