@@ -12,6 +12,8 @@ setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
 source('data_processing.R') # script used for data processing/cleanup
 
 
-# TODO entropy analyses for each game_id
+#' TODO entropy analyses for each game_id
+
+#' TODO how do we know people are trying to *win*? Subjective random choice seems like defense, not offense
 
 
