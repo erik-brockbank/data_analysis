@@ -12,10 +12,12 @@ rm(list = ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
 
 library(tidyverse)
+library(viridis)
 
 
 DATA_FILE = "rps_raw.csv" # name of file containing full dataset for all rounds
-
+SHORT_ROUND_PLAYERS = c("6ac3a837-c8cc-4bd0-9cd9-40d6dcd6c0c1", "960a15dd-c442-4693-a55d-0096fe8c14b3",
+                        "c45e2174-9181-43a9-a834-c918c4201273", "dd051569-60c1-43c6-8691-f49a47008cd8")
 
 #######################
 ### DATA PROCESSING ###
@@ -33,7 +35,7 @@ read.data = function(filename) {
 # returns entropy value for that set of move proportions
 get.entropy = function(proportions) {
   # S = - SUM_i { p_i * log(p_i) } for probability vector p of R, P, S
-  -sum(proportions$move_pct * log10(proportions$move_pct))
+  -sum(proportions$move_pct * log2(proportions$move_pct))
 }
 
 
@@ -210,7 +212,7 @@ table(data$player_id)
 
 ### Response times ###
 plot.rt(data) # 100 trial participants look a lot like 300 trial participants
-sort(data$player_rt)[1:50] # we have some very low RTs...
+sort(data$player_rt)[1:50] # we have some very low RTs: should we exclude all < 800ms?
 plot.rt.sequence(data) # by quartile, people do seem to be going faster: are they caring less?
 
 
