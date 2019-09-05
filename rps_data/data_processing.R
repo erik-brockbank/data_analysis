@@ -190,7 +190,7 @@ plot.scores = function(data) {
   
   score.summary %>%
     ggplot(aes(x = final_score)) +
-    geom_histogram(binwidth = 20) +
+    geom_histogram(binwidth = 10) +
     labs(x = "Participant scores") +
     ggtitle("Distribution of participant final scores") +
     individ_plot_theme
