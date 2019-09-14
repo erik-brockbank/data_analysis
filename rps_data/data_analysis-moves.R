@@ -1,16 +1,24 @@
 #'
-#' This is the data analysis script for RPS data
-#' This script should *not* be used for general data overview, cleaning etc.
-#' Do that in `data_processing.R` and use this script for more complex analyses.
+#' This is the first level data analysis script for RPS data,
+#' looking at dependencies in participant *move distributions* {R, P, S}
+#' based on previous combinations of participant and opponent moves (R, P, S).
+#' 
+#' This script should *not* be used for general data overview, cleaning etc. 
+#' (that happens in `data_processing.R`) and should not be used for analyses that extend
+#' beyond move distribution dependencies.
+#' 
 
-
-# TODO make this a summary RMD once we have all data
 
 rm(list = ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
 
 source('data_processing.R') # script used for data processing/cleanup
 glimpse(data)
+
+
+PLAYER_SET = unique(data$player_id)
+MOVE_SET = c("rock", "paper", "scissors")
+
 
 
 ##########################
@@ -125,27 +133,36 @@ get.player.prev.move.cond.probs = function(data) {
     filter(!is.na(prev.move), # lag call above sets NA for lag on very first move: ignore it here
            player_move != "none", prev.move != "none") %>% # ignore "none" moves for this aggregation
     count(move_prev.move) %>%
-    mutate(total.moves = sum(n),
-           pmove_prev.move = n / total.moves) %>% # probability of this category of move, e.g. probability of "rock-paper"
     group_by(player_id, move_prev.move) %>%
     mutate(player_move = strsplit(move_prev.move, "-")[[1]][1], # add player_move back in because we lose it in the count() call above
-           prev.move = strsplit(move_prev.move, "-")[[1]][2]) # add prev.move back in because we lose it in the count() call above
+           prev.move = strsplit(move_prev.move, "-")[[1]][2]) %>% # add prev.move back in because we lose it in the count() call above
+    group_by(player_id, prev.move) %>%
+    mutate(row.totals = sum(n),
+           # probability of this player move, conditioned on previous move
+           pmove_prev.move = n / row.totals)
 }
 
 
 #' Function to summarize probability of each move for each participant,
 #' conditioned on their *own* previous *two* moves.
-#' TODO see if this can be unified with the above by parameterizing the number of previous moves
 get.player.prev.2move.cond.probs = function(data) {
-  data %>%
-    filter(!player_id %in% SHORT_ROUND_PLAYERS, # remove 100 round players
-           # TODO make the below filter less manual (these IDs found with setdiff)
-           !player_id %in% c("75e0d5b8-d10a-4294-9cc9-8a56147aab19", # remove players that don't get all combos
-                             "b1946ade-acb5-4eb2-ac1c-91407c7cf60f",
-                             "82b59736-9145-4c23-bd3b-3fae693b414f",
-                             "8c469812-e717-479e-b9e4-f390d202ee51",
-                             "13fc0ff6-29ad-4121-a87b-5b32be6cc2cd",
-                             "a7da0ec9-5270-4f70-9052-7b3ca490623c")) %>%
+  prev.2move.df = data.frame(player_id = character(), player_move = character(), prev.move = character(), prev.move2 = character(),
+                             n = numeric(), row.totals = numeric())
+  # TODO can we do this without a nested loop....
+  # Bayesian smoothing, put count of 1 in each combination before adding true counts
+  for (player.move in MOVE_SET) {
+    for (prev.move in MOVE_SET) {
+      for (prev.move2 in MOVE_SET) {
+        prev.2move.df = rbind(prev.2move.df, data.frame(player_id = PLAYER_SET,
+                                                        player_move = player.move,
+                                                        prev.move = prev.move,
+                                                        prev.move2 = prev.move2,
+                                                        n = 1, row.totals = length(MOVE_SET)))
+        
+      }
+    }
+  }
+  tmp = data %>%
     group_by(player_id) %>%
     mutate(prev.move = lag(player_move, 1), # one move back (previous move)
            prev.move2 = lag(player_move, 2), # two moves back
@@ -153,13 +170,20 @@ get.player.prev.2move.cond.probs = function(data) {
     filter(!is.na(prev.move), !is.na(prev.move2), # lag calls above set NA for lag on first move and second moves: ignore it here
            player_move != "none", prev.move != "none", prev.move2 != "none") %>% # ignore "none" moves for this aggregation
     count(move_2prev.move) %>%
-    mutate(total.moves = sum(n),
-           pmove_2prev.move = n / total.moves) %>% # probability of this category of move, e.g. probability of "rock-paper-rock"
     group_by(player_id, move_2prev.move) %>%
     mutate(player_move = strsplit(move_2prev.move, "-")[[1]][1], # add player_move back in because we lose it in the count() call above
            prev.move = strsplit(move_2prev.move, "-")[[1]][2], # add prev.move back in because we lose it in the count() call above
-           prev.move2 = strsplit(move_2prev.move, "-")[[1]][3]) # add prev.move2 back in because we lose it in the count() call above
+           prev.move2 = strsplit(move_2prev.move, "-")[[1]][3]) %>% # add prev.move2 back in because we lose it in the count() call above
+    group_by(player_id, prev.move, prev.move2) %>%
+    mutate(row.totals = sum(n))
   
+  # return initial counts set to 1 in prev.2move.df plus counts calculated in tmp above
+  left_join(prev.2move.df, tmp, by = c("player_id", "player_move", "prev.move", "prev.move2")) %>%
+    mutate(n.agg = ifelse(is.na(n.y), n.x, n.x + n.y),
+           row.totals.agg = ifelse(is.na(row.totals.y), row.totals.x, row.totals.x + row.totals.y),
+           pmove_2prev.move = n.agg / row.totals.agg) %>%
+    select(player_id, player_move, prev.move, prev.move2, 
+           n.agg, row.totals.agg, pmove_2prev.move)
 }
 
 
@@ -179,20 +203,35 @@ get.opponent.prev.move.cond.probs = function(data) {
     filter(player_move != "none", opponent.prev.move != "none") %>% # ignore "none" moves for this aggregation
     group_by(player_id) %>%
     count(move_opponent.prev.move) %>%
-    mutate(total.moves = sum(n),
-           pmove_opponent.prev.move = n / total.moves) %>% # probability of this category of move, e.g. probability of "rock-paper"
     group_by(player_id, move_opponent.prev.move) %>%
     mutate(player_move = strsplit(move_opponent.prev.move, "-")[[1]][1], # add player_move back in because we lose it in the count() call above
-           opponent.prev.move = strsplit(move_opponent.prev.move, "-")[[1]][2]) # add opponent.prev.move back in because we lose it in the count() call above
+           opponent.prev.move = strsplit(move_opponent.prev.move, "-")[[1]][2]) %>% # add opponent.prev.move back in because we lose it in the count() call above
+    group_by(player_id, opponent.prev.move) %>%
+    mutate(row.totals = sum(n),
+           # probability of this player move, conditioned on opponent previous move
+           pmove_opponent.prev.move = n / row.totals)
 }
 
 #' Function to summarize probability of each move for each participant,
 #' conditioned on their *opponent's* previous *two* moves
 get.opponent.prev.2move.cond.probs = function(data) {
-  data %>%
-    filter(!player_id %in% SHORT_ROUND_PLAYERS, # remove 100 round players
-           # TODO make the below filter less manual (these IDs found with setdiff and the table that gets printed out below)
-           !player_id %in% c("5c32a426-3278-47e7-acb2-b68d0c3290d1")) %>% # remove players that don't get all combos
+  prev.2move.df = data.frame(player_id = character(), player_move = character(), opponent.prev.move = character(), opponent.prev.move2 = character(),
+                            n = numeric(), row.totals = numeric())
+  # TODO can we do this without a nested loop....
+  # Bayesian smoothing, put count of 1 in each combination before adding true counts
+  for (player.move in MOVE_SET) {
+    for (prev.move in MOVE_SET) {
+      for (prev.move2 in MOVE_SET) {
+        prev.2move.df = rbind(prev.2move.df, data.frame(player_id = PLAYER_SET,
+                                                      player_move = player.move,
+                                                      opponent.prev.move = prev.move,
+                                                      opponent.prev.move2 = prev.move2,
+                                                      n = 1, row.totals = length(MOVE_SET)))
+        
+      }
+    }
+  }
+  tmp = data %>%
     # add each player's previous two moves, then use that when referencing opponent's previous moves
     group_by(player_id) %>%
     mutate(prev.move = lag(player_move, 1), # one move back (previous move)
@@ -207,24 +246,44 @@ get.opponent.prev.2move.cond.probs = function(data) {
     filter(player_move != "none", opponent.prev.move != "none", opponent.prev.move2 != "none") %>% # ignore "none" moves for this aggregation
     group_by(player_id) %>%
     count(move_2prev.opponent.move) %>%
-    mutate(total.moves = sum(n),
-           pmove_opponent.2prev.move = n / total.moves) %>% # probability of this category of move, e.g. probability of "rock-paper-paper"
     group_by(player_id, move_2prev.opponent.move) %>%
     mutate(player_move = strsplit(move_2prev.opponent.move, "-")[[1]][1], # add player_move back in because we lose it in the count() call above
            opponent.prev.move = strsplit(move_2prev.opponent.move, "-")[[1]][2], # add opponent.prev.move back in because we lose it in the count() call above
-           opponent.prev.move2 = strsplit(move_2prev.opponent.move, "-")[[1]][3]) # add opponent.prev.move2 back in because we lose it in the count() call above
+           opponent.prev.move2 = strsplit(move_2prev.opponent.move, "-")[[1]][3]) %>% # add opponent.prev.move2 back in because we lose it in the count() call above
+    group_by(player_id, opponent.prev.move, opponent.prev.move2) %>%
+    mutate(row.totals = sum(n))
+  
+  # return initial counts set to 1 in prev.2move.df plus counts calculated in tmp above
+  left_join(prev.2move.df, tmp, by = c("player_id", "player_move", "opponent.prev.move", "opponent.prev.move2")) %>%
+    mutate(n.agg = ifelse(is.na(n.y), n.x, n.x + n.y),
+           row.totals.agg = ifelse(is.na(row.totals.y), row.totals.x, row.totals.x + row.totals.y),
+           pmove_opponent.2prev.move = n.agg / row.totals.agg) %>%
+    select(player_id, player_move, opponent.prev.move, opponent.prev.move2, 
+           n.agg, row.totals.agg, pmove_opponent.2prev.move)
 }
 
 
 #' Function to summarize probability of each move for each participant,
 #' conditioned on the combination of their previous move *and* their opponent's previous move
 get.player.opponent.prev.move.cond.probs = function(data) {
-  data %>%
-    filter(!player_id %in% SHORT_ROUND_PLAYERS, # remove 100 round players
-           # TODO make the below filter less manual (these IDs found with setdiff and the table that gets printed out below)
-           !player_id %in% c("75e0d5b8-d10a-4294-9cc9-8a56147aab19", # remove players that don't get all combos
-                             "5c32a426-3278-47e7-acb2-b68d0c3290d1",
-                             "701c37d8-2e90-411f-9e8b-0b8abf7c0516")) %>%
+  prev.2move.df = data.frame(player_id = character(), player_move = character(), opponent.prev.move = character(), opponent.prev.move2 = character(),
+                             n = numeric(), row.totals = numeric())
+  # TODO can we do this without a nested loop....
+  # Bayesian smoothing, put count of 1 in each combination before adding true counts
+  for (player.move in MOVE_SET) {
+    for (prev.move in MOVE_SET) {
+      for (prev.move2 in MOVE_SET) {
+        prev.2move.df = rbind(prev.2move.df, data.frame(player_id = PLAYER_SET,
+                                                        player_move = player.move,
+                                                        prev.move = prev.move,
+                                                        opponent.prev.move = prev.move2,
+                                                        n = 1, row.totals = length(MOVE_SET)))
+        
+      }
+    }
+  }
+  
+  tmp = data %>%
     # add each player's previous move, then use that when referencing opponent's previous move
     group_by(player_id) %>%
     mutate(prev.move = lag(player_move, 1)) %>%
@@ -237,13 +296,22 @@ get.player.opponent.prev.move.cond.probs = function(data) {
     filter(player_move != "none", prev.move != "none", opponent.prev.move != "none") %>% # ignore "none" moves for this purpose
     group_by(player_id) %>%
     count(move_prev.move_opponent.prev.move) %>%
-    mutate(total.moves = sum(n),
-           pmove_prev.move_opponent.prev.move = n / total.moves) %>% # probability of this category of move, e.g. probability of "rock-scissors-scissors"
     group_by(player_id, move_prev.move_opponent.prev.move) %>%
     mutate(player_move = strsplit(move_prev.move_opponent.prev.move, "-")[[1]][1], # add player_move back in because we lose it in the count() call above
            prev.move = strsplit(move_prev.move_opponent.prev.move, "-")[[1]][2], # add prev.move back in because we lose it in the count() call above
-           opponent.prev.move = strsplit(move_prev.move_opponent.prev.move, "-")[[1]][3]) # add opponent.prev.move back in because we lose it in the count() call above
-  }
+           opponent.prev.move = strsplit(move_prev.move_opponent.prev.move, "-")[[1]][3]) %>% # add opponent.prev.move back in because we lose it in the count() call above
+    group_by(player_id, prev.move, opponent.prev.move) %>%
+    mutate(row.totals = sum(n))
+  
+  # return initial counts set to 1 in prev.2move.df plus counts calculated in tmp above
+  left_join(prev.2move.df, tmp, by = c("player_id", "player_move", "prev.move", "opponent.prev.move")) %>%
+    mutate(n.agg = ifelse(is.na(n.y), n.x, n.x + n.y),
+           row.totals.agg = ifelse(is.na(row.totals.y), row.totals.x, row.totals.x + row.totals.y),
+           pmove_prev.move_opponent.prev.move = n.agg / row.totals.agg) %>%
+    select(player_id, player_move, prev.move, opponent.prev.move, 
+           n.agg, row.totals.agg, pmove_prev.move_opponent.prev.move)
+    
+}
 
 
 ################
@@ -305,9 +373,6 @@ opponent.prev.move.entropy = opponent.prev.move.summary %>%
  
 
 ### Third order analysis 1: p(move = x | prev. move = y, opponent prev. move = z) -> 27 cells ###
-
-# TODO is the exclusion of people who don't fill in all 27 categories of previous move, opponent's previous move category legit?
-
 # get probability associated with a move, given combination of previous move, opponent's previous move
 player.opponent.prev.move.summary = get.player.opponent.prev.move.cond.probs(data) 
 
@@ -329,7 +394,6 @@ player.opponent.prev.move.entropy = player.opponent.prev.move.summary %>%
   filter(prev.move_opponent.prev.move.x == prev.move_opponent.prev.move.y) %>%
   # sum normalized entropy for distribution of each move given each prev. move, opponent's previous move
   summarize(entropy.2.player.opponent = sum(player.opponent.prev.move.entropy.norm))
-
 
 
 ### Third order analysis 2: p(move = x | prev. move 1 = y, prev. move 2 = z) -> 27 cells ###
@@ -387,42 +451,55 @@ opponent.prev.2move.entropy = opponent.prev.2move.summary %>%
 
 
 ENTROPY_SUMMARY = player.entropy %>%
-  inner_join(player.prev.move.entropy, by = "player_id") %>%
-  inner_join(opponent.prev.move.entropy, by = "player_id") %>%
-  inner_join(player.opponent.prev.move.entropy, by = "player_id") %>%
-  inner_join(player.prev.2move.entropy, by = "player_id") %>%
-  inner_join(opponent.prev.2move.entropy, by = "player_id") %>%
+  left_join(player.prev.move.entropy, by = "player_id") %>%
+  left_join(opponent.prev.move.entropy, by = "player_id") %>%
+  left_join(player.opponent.prev.move.entropy, by = "player_id") %>%
+  left_join(player.prev.2move.entropy, by = "player_id") %>%
+  left_join(opponent.prev.2move.entropy, by = "player_id") %>%
   gather(entropy.type, entropy.val, entropy.0:entropy.2.opponent)
 
 
-# sanity check: log2 of the total outcomes in a round is similar to mean overall entropy
-log2(3)
-mean(ENTROPY_SUMMARY$entropy.val[ENTROPY_SUMMARY$entropy.type == "overall.entropy"])
-
-
+graph.labels = c("entropy.0" = "Distribution of moves", 
+                 "entropy.1.player" = "Distribution of moves given player's previous move",
+                 "entropy.1.opponent" = "Distribution of moves given opponent's previous move",
+                 "entropy.2.player.opponent" = "Distribution of moves given player's previous move, opponent's previous move",
+                 "entropy.2.player" = "Distribution of moves given player's previous two moves",
+                 "entropy.2.opponent" = "Distribution of moves given opponent's previous two moves")
+xlab = "Participant move distributions"
+ylab = "Shannon Entropy (S)"
 
 ENTROPY_SUMMARY %>%
   ggplot() +
   geom_violin(aes(x = entropy.type, y = entropy.val, color = entropy.type)) +
   geom_jitter(aes(x = entropy.type, y = entropy.val, color = entropy.type), width = 0.25, alpha = 0.5, size = 2) +
-  labs(x = "Participant move distributions", y = "Shannon Entropy (S)") +
-  ggtitle("Entropy comparison across participant move distributions") +
+  labs(x = xlab, y = ylab) +
+  ggtitle("Entropy values across participant move distributions") +
   scale_color_viridis(discrete = TRUE,
                       name = element_blank(),
-                      labels = c("entropy.0" = "Distribution of moves", 
-                                 "entropy.1.player" = "Distribution of moves given player's previous move",
-                                 "entropy.1.opponent" = "Distribution of moves given opponent's previous move",
-                                 "entropy.2.player.opponent" = "Distribution of moves given player's previous move, opponent's previous move",
-                                 "entropy.2.player" = "Distribution of moves given player's previous two moves",
-                                 "entropy.2.opponent" = "Distribution of moves given opponent's previous two moves"),
+                      labels = graph.labels,
                       guide = guide_legend(nrow = length(unique(ENTROPY_SUMMARY$entropy.type)))) +
   individ_plot_theme +
   theme(plot.title = element_text(face = "bold", size = 20)) +
   theme(axis.text.x = element_blank())
 
-# TODO if lowest average entropy distribution is ~0.5, does this mean that distribution of
-# possible moves given e.g. previous two moves only ever has 2^0.5 ~= 1.4 outcomes?
 
+ENTROPY_SUMMARY %>%
+  group_by(entropy.type) %>%
+  summarize(mean.entropy = mean(entropy.val),
+            se.entropy = sd(entropy.val) / sqrt(length(unique(player_id)))) %>%
+  ggplot(aes(x = entropy.type, color = entropy.type)) +
+  geom_point(aes(y = mean.entropy), size = 3) +
+  geom_errorbar(aes(ymin = mean.entropy - se.entropy, ymax = mean.entropy + se.entropy),
+                width = 0.5) +
+  labs(x = xlab, y = ylab) +
+  ggtitle("Entropy summary across participant move distributions") +
+  scale_color_viridis(discrete = TRUE,
+                      name = element_blank(),
+                      labels = graph.labels,
+                      guide = guide_legend(nrow = length(unique(ENTROPY_SUMMARY$entropy.type)))) +
+  individ_plot_theme +
+  theme(plot.title = element_text(face = "bold", size = 20)) +
+  theme(axis.text.x = element_blank())
 
 
 #############
@@ -434,10 +511,6 @@ ENTROPY_SUMMARY %>%
 #' First, we just test the idea that there is something predictive about all individuals generally.
 #' Then, we dive into whether looking at an individual's dyad tells us even more (i.e. is there stable dyad behavior that varies across dyads)
 
-
-#' TODO next steps:
-#' switch to alternative structure (e.g. +/-/0) that allows for more efficient encoding (do this in a separate script for easy navigation)
-#' At that point, we should have an answer about what dependencies we see in people's choices overall: next steps are to look at dyad behavior
 
 
 
