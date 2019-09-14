@@ -143,6 +143,26 @@ plot.moves = function(data) {
     facet_wrap(~participant_abbrev, scales = "free_y", ncol = 4)
 }
 
+# Check how well-matched players were in each dyad
+plot.outcomes = function(data) {
+  outcome.summary = data %>%
+    group_by(player_id) %>%
+    count(player_outcome) %>%
+    mutate(total = sum(n),
+           outcome_pct = n / total,
+           participant_abbrev = strsplit(player_id, "-")[[1]][5])
+  
+  outcome.summary %>%
+    ggplot(aes(x = player_outcome, y = outcome_pct)) +
+    geom_bar(stat = "identity", width = 0.5) +
+    geom_hline(yintercept = 0.33, linetype = "dashed", color = "red") +
+    labs(x = "Outcome", y = "Percent") +
+    ggtitle("Outcome percentage by participant") +
+    individ_plot_theme +
+    facet_wrap(~participant_abbrev, scales = "free_y", ncol = 4)
+}
+
+
 # Check that entropy of each player's moves stays relatively consistent
 # -> If it goes down substantially, this is a sign they may have stopped trying
 plot.move.sequence = function(data) {
@@ -230,21 +250,28 @@ for (player in unique(data$player_id)) {
 chisq_tests # several of these are highly significant: people are not choosing an even balance of R, P, S
 
 
+### Outcomes ###
+plot.outcomes(data) # No players appear wildly mismatched, though score differential does suggest there may have been a couple
+
+
 ### Scores ###
 plot.scores(data) 
 # for 100 rounds, max: 300; min: -100; expected: 66
 # for 300 rounds, max: 900; min: -300; expected: 200
+# Look at final point differentials by dyad to see what distribution of point differences looked like
+data %>%
+  group_by(game_id) %>%
+  filter(round_index == max(round_index)) %>%
+  mutate(final_score = player_total + player_points,
+         point_diff = abs(final_score - lag(final_score, 1))) %>%
+  filter(!is.na(point_diff)) %>%
+  select(game_id, point_diff)
+
 
 
 ### Effort ###
 # Are people trying throughout the experiment?
 # Note this should also be reflected in the response times
 plot.move.sequence(data) # entropy wobbles around by decile but doesnt appear to fall off a cliff for anybody
-
-
-
-# TODO
-# Distribution of outcomes for each player? 
-
 
 
