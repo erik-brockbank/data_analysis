@@ -37,7 +37,9 @@ get.player.move.dist = function(data) {
 }
 
 
-#' Function to get marginal probability of each previous move for each participant
+#' Function to get marginal probability of each *previous* move for each participant
+#' Note this is almost identical to the above function except that it looks at fewer 
+#' moves (since it's only evaluating what was at one point the previous move)
 get.player.prev.move.dist = function(data) {
   data %>%
     group_by(player_id) %>%
