@@ -1,6 +1,6 @@
 # Script for reading in phystables_env data and processing/analyzing
 rm(list=ls())
-setwd("/Users/erikbrockbank/web/vullab/data_analysis/phystables_env/")
+setwd("~/web/vullab/data_analysis/phystables_env_data")
 
 library(tidyverse)
 
@@ -47,6 +47,10 @@ data$containment = unlist(lapply(scenario.split, "[", 4))
 data$complexity = unlist(lapply(scenario.split, "[", 6))
 data$rotation = unlist(lapply(scenario.split, "[", 7))
 data$rotation[is.na(data$rotation)] = "NONE" # avoid NAs in this column
+
+# remove distractor trials
+data = data %>%
+  filter(rotation %in% c("NONE", "LEFT", "RIGHT", "TWICE"))
 
 
 # Add column for (log) response time
@@ -693,162 +697,6 @@ summary(accuracy.containment.complexity)
 # For some reason this breaks everything, too slow
 model.basic = with(data, aov(log.responsetime ~ scenario * containment * complexity * rotation + 
                  Error(subjID / (scenario * containment * complexity * rotation))))
-
-
-
-
-
-
-
-#######################
-### SIMULATION DATA ###
-#######################
-
-
-# TODO turn up the noise parameter on the ball's velocity in the simulator?
-
-
-sim.data = read_csv("containment_sims.csv")
-glimpse(sim.data)
-
-table(sim.data$trialname)
-
-# add scenario, complexity, containment rotation
-scenario.split = with(sim.data, strsplit(trialname, "_"))
-sim.data$scenario = unlist(lapply(scenario.split, "[", 2))
-sim.data$containment = unlist(lapply(scenario.split, "[", 4))
-sim.data$complexity = unlist(lapply(scenario.split, "[", 6))
-sim.data$rotation = unlist(lapply(scenario.split, "[", 7))
-sim.data$rotation[is.na(sim.data$rotation)] = "NONE" # avoid NAs in this column
-
-# check new columns
-glimpse(sim.data)
-table(sim.data$rotation)
-
-# convert trial sims to milliseconds, add log trial sims
-sim.data$tsims.ms = sim.data$tsims * 1000
-sim.data$log.tsims.ms = log10(sim.data$tsims.ms)
-
-dim(sim.data)
-# Remove non-terminated trials
-sim.data = sim.data %>%
-  filter(outcome %in% c("REDGOAL", "GREENGOAL"))
-dim(sim.data) # removes about 900 rows w/ 50s max, 12k rows with 10s max
-
-
-#### MEAN SIMTIME ###
-title = "Simulation times across complexity, containment levels"
-xlab = "Complexity level"
-ylab = "Mean simulation time (ms)"
-
-# Calculate means, CIs
-simtime.means = sim.data %>%
-  group_by(containment, complexity) %>%
-  summarize(means = mean(tsims.ms),
-            trials = n(),
-            se.lower = means - sqrt(var(tsims.ms) / length(tsims.ms)),
-            se.upper = means + sqrt(var(tsims.ms) / length(tsims.ms))) %>%
-  select(containment, complexity, means, trials, se.lower, se.upper)
-# Graph data
-make.canonical.bargraph(simtime.means, title, xlab, ylab)
-
-simtime.means %>%
-  ggplot(aes(x = complexity, y = means)) +
-  geom_point(size = 5) +
-  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
-  scale_x_discrete(labels = complexity_labels) +
-  facet_wrap(. ~ containment,
-             scales = "free",
-             labeller = labeller(containment = containment_labels)) +
-  #scale_y_continuous(limits = c(0, 20), breaks = seq(0, 20, by = 5)) +
-  labs(x = xlab, y = ylab) +
-  ggtitle(title) +
-  default.theme
-
-### LOG SIMTIME ### 
-title = "Log simulation times across complexity, containment levels"
-xlab = "Complexity level"
-ylab = "Mean simulation time (log10 ms)"
-
-# Calculate means, CIs
-log.simtime.means = sim.data %>%
-  group_by(containment, complexity) %>%
-  summarize(means = mean(log.tsims.ms),
-            trials = n(),
-            se.lower = means - sqrt(var(log.tsims.ms) / length(log.tsims.ms)),
-            se.upper = means + sqrt(var(log.tsims.ms) / length(log.tsims.ms))) %>%
-  select(containment, complexity, means, trials, se.lower, se.upper)
-# Graph data
-log.simtime.means %>%
-  ggplot(aes(x = complexity, y = means, ymin = se.lower, ymax = se.upper)) +
-  geom_pointrange() +
-  scale_x_discrete(labels = complexity_labels) +
-  facet_wrap(. ~ containment,
-             scales = "free_x",
-             labeller = labeller(containment = containment_labels)) +
-  labs(x = xlab, y = ylab) +
-  ggtitle(title)
-
-
-sim.data %>%
-  group_by(containment, complexity) %>%
-  summarize(trials = n(),
-            goal = sum(outcome == "REDGOAL" | outcome == "GREENGOAL"),
-            timeup = sum(outcome == "TIMEUP"),
-            timeup.prop = timeup / trials)
-
-
-### MEAN BOUNCES ###
-
-title = "Number of bounces across complexity, containment levels"
-xlab = "Complexity level"
-ylab = "Mean bounces"
-
-# Calculate means, CIs
-bounce.means = sim.data %>%
-  group_by(containment, complexity) %>%
-  summarize(means = mean(bounces),
-            trials = n(),
-            se.lower = means - sqrt(var(bounces) / length(bounces)),
-            se.upper = means + sqrt(var(bounces) / length(bounces))) %>%
-  select(containment, complexity, means, trials, se.lower, se.upper)
-# Graph data
-make.canonical.bargraph(bounce.means, title, xlab, ylab)
-
-
-
-### SIMTIME PER SCENARIO ###
-title = "Simulation times across scenarios by complexity, containment levels"
-xlab = "Complexity level"
-ylab = "Mean simulation time"
-
-# Calculate means, CIs
-simtime.scenario.means = sim.data %>%
-  group_by(scenario, containment, complexity) %>%
-  summarize(means = mean(tsims.ms),
-            trials = n(),
-            se.lower = means - sqrt(var(tsims.ms) / length(tsims.ms)),
-            se.upper = means + sqrt(var(tsims.ms) / length(tsims.ms))) %>%
-  select(scenario, containment, complexity, means, trials, se.lower, se.upper)
-# Graph data
-make.canonical.bargraph.scenario(simtime.scenario.means, title, xlab, ylab)
-
-
-### BOUNCES PER SCENARIO ###
-title = "Bounces across scenarios by complexity, containment levels"
-xlab = "Complexity level"
-ylab = "Mean bounces"
-
-# Calculate means, CIs
-bounce.scenario.means = sim.data %>%
-  group_by(scenario, containment, complexity) %>%
-  summarize(means = mean(bounces),
-            trials = n(),
-            se.lower = means - sqrt(var(bounces) / length(bounces)),
-            se.upper = means + sqrt(var(bounces) / length(bounces))) %>%
-  select(scenario, containment, complexity, means, trials, se.lower, se.upper)
-# Graph data
-make.canonical.bargraph.scenario(bounce.scenario.means, title, xlab, ylab)
 
 
 

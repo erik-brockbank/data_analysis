@@ -1,0 +1,25 @@
+subjID,is_control,judgment_index,judgment_shape,judgment_catches_fish,input_judgment,input_judgment_conf
+user_1573664448979,False,1,"{'top_shape': 'triangle', 'top_color': 'yellow', 'top_texture': True, 'bottom_shape': 'oval', 'bottom_color': 'blue', 'bottom_texture': False}",0,0,6
+user_1573664448979,False,2,"{'top_shape': 'diamond', 'top_color': 'red', 'top_texture': False, 'bottom_shape': 'diamond', 'bottom_color': 'green', 'bottom_texture': False}",1,1,6
+user_1573664448979,False,3,"{'top_shape': 'oval', 'top_color': 'green', 'top_texture': True, 'bottom_shape': 'triangle', 'bottom_color': 'yellow', 'bottom_texture': False}",1,1,6
+user_1573664448979,False,4,"{'top_shape': 'triangle', 'top_color': 'red', 'top_texture': False, 'bottom_shape': 'teardrop', 'bottom_color': 'green', 'bottom_texture': True}",0,0,6
+user_1573664448979,False,5,"{'top_shape': 'circle', 'top_color': 'blue', 'top_texture': False, 'bottom_shape': 'star', 'bottom_color': 'red', 'bottom_texture': False}",1,1,6
+user_1573664448979,False,6,"{'top_shape': 'star', 'top_color': 'green', 'top_texture': True, 'bottom_shape': 'oval', 'bottom_color': 'blue', 'bottom_texture': True}",0,0,6
+user_1573664448979,False,7,"{'top_shape': 'oval', 'top_color': 'yellow', 'top_texture': False, 'bottom_shape': 'circle', 'bottom_color': 'red', 'bottom_texture': True}",0,0,6
+user_1573664448979,False,8,"{'top_shape': 'teardrop', 'top_color': 'blue', 'top_texture': False, 'bottom_shape': 'star', 'bottom_color': 'yellow', 'bottom_texture': False}",1,1,6
+user_1573664082430,False,1,"{'top_shape': 'triangle', 'top_color': 'yellow', 'top_texture': True, 'bottom_shape': 'oval', 'bottom_color': 'blue', 'bottom_texture': False}",0,0,6
+user_1573664082430,False,2,"{'top_shape': 'diamond', 'top_color': 'red', 'top_texture': False, 'bottom_shape': 'diamond', 'bottom_color': 'green', 'bottom_texture': False}",1,1,6
+user_1573664082430,False,3,"{'top_shape': 'oval', 'top_color': 'green', 'top_texture': True, 'bottom_shape': 'triangle', 'bottom_color': 'yellow', 'bottom_texture': False}",1,1,5
+user_1573664082430,False,4,"{'top_shape': 'triangle', 'top_color': 'red', 'top_texture': False, 'bottom_shape': 'teardrop', 'bottom_color': 'green', 'bottom_texture': True}",0,0,3
+user_1573664082430,False,5,"{'top_shape': 'circle', 'top_color': 'blue', 'top_texture': False, 'bottom_shape': 'star', 'bottom_color': 'red', 'bottom_texture': False}",1,0,4
+user_1573664082430,False,6,"{'top_shape': 'star', 'top_color': 'green', 'top_texture': True, 'bottom_shape': 'oval', 'bottom_color': 'blue', 'bottom_texture': True}",0,0,5
+user_1573664082430,False,7,"{'top_shape': 'oval', 'top_color': 'yellow', 'top_texture': False, 'bottom_shape': 'circle', 'bottom_color': 'red', 'bottom_texture': True}",0,0,5
+user_1573664082430,False,8,"{'top_shape': 'teardrop', 'top_color': 'blue', 'top_texture': False, 'bottom_shape': 'star', 'bottom_color': 'yellow', 'bottom_texture': False}",1,1,4
+user_1573664238101,True,1,"{'top_shape': 'triangle', 'top_color': 'yellow', 'top_texture': True, 'bottom_shape': 'oval', 'bottom_color': 'blue', 'bottom_texture': False}",0,1,2
+user_1573664238101,True,2,"{'top_shape': 'diamond', 'top_color': 'red', 'top_texture': False, 'bottom_shape': 'diamond', 'bottom_color': 'green', 'bottom_texture': False}",1,0,2
+user_1573664238101,True,3,"{'top_shape': 'oval', 'top_color': 'green', 'top_texture': True, 'bottom_shape': 'triangle', 'bottom_color': 'yellow', 'bottom_texture': False}",1,1,2
+user_1573664238101,True,4,"{'top_shape': 'triangle', 'top_color': 'red', 'top_texture': False, 'bottom_shape': 'teardrop', 'bottom_color': 'green', 'bottom_texture': True}",0,1,2
+user_1573664238101,True,5,"{'top_shape': 'circle', 'top_color': 'blue', 'top_texture': False, 'bottom_shape': 'star', 'bottom_color': 'red', 'bottom_texture': False}",1,0,2
+user_1573664238101,True,6,"{'top_shape': 'star', 'top_color': 'green', 'top_texture': True, 'bottom_shape': 'oval', 'bottom_color': 'blue', 'bottom_texture': True}",0,1,2
+user_1573664238101,True,7,"{'top_shape': 'oval', 'top_color': 'yellow', 'top_texture': False, 'bottom_shape': 'circle', 'bottom_color': 'red', 'bottom_texture': True}",0,1,2
+user_1573664238101,True,8,"{'top_shape': 'teardrop', 'top_color': 'blue', 'top_texture': False, 'bottom_shape': 'star', 'bottom_color': 'yellow', 'bottom_texture': False}",1,0,2
