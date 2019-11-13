@@ -72,7 +72,7 @@ individ_plot_theme = theme(
   legend.title = element_text(face = "bold", size = 16),
   # axis text
   axis.text.y = element_text(size = 12),
-  axis.text.x = element_text(size = 12, angle = 90, hjust = 0, vjust = 0),
+  axis.text.x = element_text(size = 12, angle = 45, vjust = 0.5),
   # legend text
   legend.text = element_text(size = 14),
   # facet text
@@ -98,7 +98,7 @@ plot.rt = function(data) {
     ggplot(aes(x = player_id, y = player_rt)) +
     geom_jitter(alpha = 0.5, size = 0.8, width = 0.25, color = "blue") +
     mylogy(c(1, 10000)) +
-    labs(x = "Participant", y = "Log10 trial RT (ms, max 10000)") +
+    labs(x = "Participant", y = "RT (ms)") +
     ggtitle("Response times by participant") +
     individ_plot_theme +
     theme(axis.text.x = element_blank())
@@ -109,7 +109,7 @@ plot.rt.sequence = function(data) {
   quartile.data = data %>%
     group_by(player_id) %>%
     mutate(round_quartile = ntile(round_index, 4)) %>%
-    ungroup() %>%
+    #ungroup() %>%
     group_by(round_quartile) %>%
     summarize(quartile.mean = mean(player_rt),
               quartile.se = sd(player_rt) / sqrt(length(player_rt)))
@@ -118,8 +118,8 @@ plot.rt.sequence = function(data) {
     ggplot(aes(x = round_quartile, y = quartile.mean)) +
     geom_point() +
     geom_errorbar(aes(ymin = quartile.mean - quartile.se, ymax = quartile.mean + quartile.se)) +
-    labs(x = "Trial quartile", y = "Participant response times") +
-    ggtitle("Change in participant response times by quartile") +
+    labs(x = "Trial quartile", y = "Mean RT") +
+    ggtitle("Participant response times by quartile") +
     individ_plot_theme
 }
 
@@ -137,29 +137,36 @@ plot.moves = function(data) {
     ggplot(aes(x = player_move, y = move_pct)) +
     geom_bar(stat = "identity", width = 0.5) +
     geom_hline(yintercept = 0.33, linetype = "dashed", color = "red") +
-    labs(x = "Move", y = "Percent") +
+    labs(x = "", y = "") +
     ggtitle("Move percentage by participant") +
     individ_plot_theme +
-    facet_wrap(~participant_abbrev, scales = "free_y", ncol = 4)
+    facet_wrap(~participant_abbrev, scales = "free_y", ncol = 5)
 }
 
 # Check how well-matched players were in each dyad
 plot.outcomes = function(data) {
+  
   outcome.summary = data %>%
-    group_by(player_id) %>%
+    group_by(game_id, round_index) %>%
+    #arrange(round_index) %>%
+    filter(row_number()==1) %>%
+    ungroup() %>%
+    group_by(game_id) %>%
     count(player_outcome) %>%
     mutate(total = sum(n),
            outcome_pct = n / total,
-           participant_abbrev = strsplit(player_id, "-")[[1]][5])
+           game_id_abbrev = strsplit(game_id, "-")[[1]][5])
   
   outcome.summary %>%
     ggplot(aes(x = player_outcome, y = outcome_pct)) +
     geom_bar(stat = "identity", width = 0.5) +
     geom_hline(yintercept = 0.33, linetype = "dashed", color = "red") +
-    labs(x = "Outcome", y = "Percent") +
-    ggtitle("Outcome percentage by participant") +
+    labs(x = "", y = "") +
+    ggtitle("Outcome percentage by dyad") +
     individ_plot_theme +
-    facet_wrap(~participant_abbrev, scales = "free_y", ncol = 4)
+    scale_x_discrete(name = element_blank(),
+                     labels = c("win" = "win:loss", "loss" = "loss:win", "tie" = "tie:tie")) +
+    facet_wrap(~game_id_abbrev, ncol = 5)
 }
 
 
@@ -190,11 +197,11 @@ plot.move.sequence = function(data) {
   entropy.seq %>%
     ggplot(aes(x = subset, y = entropy)) +
     geom_line() +
-    labs(x = "ntile of trials", y = "Shannon entropy (S)") +
-    ggtitle("Entropy of participant moves over trial ntile") +
+    labs(x = "", y = "Shannon entropy (S)") +
+    ggtitle("Entropy of participant moves over trial segments") +
     individ_plot_theme +
-    facet_wrap(~participant_abbrev, scales = "free_y", ncol = 4)
-
+    facet_wrap(~participant_abbrev, scales = "free_y", ncol = 5) +
+    scale_x_continuous(name = element_blank(), breaks = seq(0, 10, 2))
 }
 
 # Check that no player did so terribly that we should be suspicious of whether they were trying
@@ -268,10 +275,70 @@ data %>%
   select(game_id, point_diff)
 
 
-
 ### Effort ###
 # Are people trying throughout the experiment?
 # Note this should also be reflected in the response times
 plot.move.sequence(data) # entropy wobbles around by decile but doesnt appear to fall off a cliff for anybody
 
+
+
+
+# TODO plot score as 1, -1, 0 then take the highest ones in each dyad to get a sense of whether anybody is reliably winning
+# can also plot 1, -1, 0 for each person over time to see if somebody "figures their opponent out" (look for long sequences at 1 or -1)
+
+
+# ANALYSIS: are the percentage of 3-move sequences what we would expect from a random player?
+seq.counts3 = data %>%
+  group_by(player_id) %>%
+  mutate(prev.move = lag(player_move, 1), # one move back (previous move)
+         prev.move2 = lag(player_move, 2), # two moves back
+         prev.move3 = lag(player_move, 3)) %>% # three moves back
+  filter(!is.na(prev.move), !is.na(prev.move2), !is.na(prev.move3), # lag calls above set NA for lag on first three moves: ignore it here
+         player_move != "none", prev.move != "none", prev.move2 != "none", prev.move3 != "none") %>%
+  group_by(player_id, round_index) %>%
+  mutate(rock.count = sum(prev.move == "rock", prev.move2 == "rock", prev.move3 == "rock"),
+         paper.count = sum(prev.move == "paper", prev.move2 == "paper", prev.move3 == "paper"),
+         scissors.count = sum(prev.move == "scissors", prev.move2 == "scissors", prev.move3 == "scissors"),
+         min.col = min(c(rock.count, paper.count, scissors.count)),
+         mid.col = median(c(rock.count, paper.count, scissors.count)),
+         max.col = max(c(rock.count, paper.count, scissors.count)),
+         seq.type = paste(min.col, mid.col, max.col, sep = "-")) %>%
+  ungroup() %>%
+  count(seq.type) %>%
+  mutate(pct = n / sum(n))
+
+seq.counts3
+chisq.test(seq.counts3$n, p = c((1/9), (6/9), (2/9)))
+
+
+
+seq.counts1 = data %>%
+  filter(player_move != "none") %>%
+  count(player_move)
+
+seq.counts1
+chisq.test(x = seq.counts1$n, p = c(1/3, 1/3, 1/3))
+
+
+seq.counts2 = data %>%
+  group_by(player_id) %>%
+  mutate(prev.move = lag(player_move, 1), # one move back (previous move)
+         prev.move2 = lag(player_move, 2)) %>% # two moves back
+  filter(!is.na(prev.move), !is.na(prev.move2), # lag calls above set NA for lag on first two moves: ignore it here
+         player_move != "none", prev.move != "none", prev.move2 != "none") %>%
+  group_by(player_id, round_index) %>%
+  mutate(rock.count = sum(prev.move == "rock", prev.move2 == "rock"),
+         paper.count = sum(prev.move == "paper", prev.move2 == "paper"),
+         scissors.count = sum(prev.move == "scissors", prev.move2 == "scissors"),
+         min.col = min(c(rock.count, paper.count, scissors.count)),
+         mid.col = median(c(rock.count, paper.count, scissors.count)),
+         max.col = max(c(rock.count, paper.count, scissors.count)),
+         seq.type = paste(min.col, mid.col, max.col, sep = "-")) %>%
+  #as.data.frame() %>%
+  ungroup() %>%
+  count(seq.type) %>%
+  mutate(pct = n / sum(n))
+
+seq.counts2
+chisq.test(x = seq.counts2$n, p = c(1/3, 2/3))
 

@@ -1,0 +1,4 @@
+expt_version,subjID,is_test,is_control,instruction_completion_time,expt_start_ts,expt_end_ts
+1,user_1573664448979,False,False,56797,1573664448979,1573665137116
+1,user_1573664082430,False,False,40675,1573664082431,1573664969835
+1,user_1573664238101,False,True,30455,1573664238101,1573664723673

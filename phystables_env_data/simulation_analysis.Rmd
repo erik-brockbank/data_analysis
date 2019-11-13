@@ -1,0 +1,331 @@
+---
+title: "Simulation Analysis - first pass"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list=ls())
+setwd("~/web/vullab/data_analysis/phystables_env_data")
+
+
+library(tidyverse)
+library(viridis)
+
+SIM_DATA_FILEPATH = "containment_sims_v2.csv"
+```
+
+
+## Analysis functions ##
+```{r function_init}
+read.data = function(filepath) {
+  data = read_csv(filepath)
+  
+  # add scenario, complexity, containment rotation
+  scenario.split = with(data, strsplit(trialname, "_"))
+  data$scenario = unlist(lapply(scenario.split, "[", 2))
+  data$containment = unlist(lapply(scenario.split, "[", 4))
+  data$complexity = unlist(lapply(scenario.split, "[", 6))
+  data$rotation = unlist(lapply(scenario.split, "[", 7))
+  data$rotation[is.na(data$rotation)] = "NONE" # avoid NAs in this column
+  # remove distractor trials
+  data = data %>%
+    filter(rotation %in% c("NONE", "LEFT", "RIGHT", "TWICE"))
+  
+  return(data)
+}
+
+get.simtime.se = function(data) {
+  data %>%
+  group_by(containment, complexity) %>%
+  # in theory this could be column-name neutral but passing in the column name breaks everything...
+  summarize(means = mean(sim_time.ms),
+            trials = n(),
+            se.lower = means - sd(sim_time.ms) / sqrt(length(sim_time.ms)),
+            se.upper = means + sd(sim_time.ms) / sqrt(length(sim_time.ms))) %>%
+  select(containment, complexity, means, trials, se.lower, se.upper)
+}
+```
+
+
+## Graphing functions ##
+```{r graphing_init}
+CONTAINMENT_LABELS = c(
+  l1 = "low containment",
+  l2 = "medium containment",
+  l3 = "high containment"
+)
+
+COMPLEXITY_LABELS = c(
+  l1 = "none",
+  l2 = "low",
+  l3 = "medium",
+  l4 = "high"
+)
+
+SCENARIO_LABELS = c(
+  sc1 = "scenario 1",
+  sc2 = "scenario 2",
+  sc3 = "scenario 3",
+  sc4 = "scenario 4"
+)
+
+CONTAINMENT_COMPLEXITY_LABELS = c(
+  "l1-l1" = "low containment, no complexity",
+  "l1-l2" = "low containment, low complexity",
+  "l1-l3" = "low containment, medium complexity",
+  "l1-l4" = "low containment, high complexity",
+  "l2-l1" = "medium containment, no complexity",
+  "l2-l2" = "medium containment, low complexity",
+  "l2-l3" = "medium containment, medium complexity",
+  "l2-l4" = "medium containment, high complexity",
+  "l3-l1" = "high containment, no complexity",
+  "l3-l2" = "high containment, low complexity",
+  "l3-l3" = "high containment, medium complexity",
+  "l3-l4" = "high containment, high complexity"
+)
+
+COMPLEXITY_CONTAINMENT_LABELS = c(
+  "l1-l1" = "no complexity, low containment",
+  "l1-l2" = "no complexity, medium containment",
+  "l1-l3" = "no complexity, high containment",
+  "l2-l1" = "low complexity, low containment",
+  "l2-l2" = "low complexity, medium containment",
+  "l2-l3" = "low complexity, high containment",
+  "l3-l1" = "medium complexity, low containment",
+  "l3-l2" = "medium complexity, medium containment",
+  "l3-l3" = "medium complexity, high containment",
+  "l4-l1" = "high complexity, low containment",
+  "l4-l2" = "high complexity, medium containment",
+  "l4-l3" = "high complexity, high containment"
+)
+
+COMPLEXITY_LABELS_VERBOSE = c(
+  l1 = "no complexity",
+  l2 = "low complexity",
+  l3 = "medium complexity",
+  l4 = "high complexity"
+)
+
+default.theme = theme(
+  # titles
+  plot.title = element_text(face = "bold", size = 32),
+  axis.title.y = element_text(face = "bold", size = 36),
+  axis.title.x = element_text(face = "bold", size = 36),
+  # axis text
+  axis.text.x = element_text(size = 24),
+  axis.text.y = element_text(size = 20),
+  # facet text
+  strip.text = element_text(face = "bold", size = 28),
+  # backgrounds, lines
+  panel.background = element_blank(),
+  strip.background = element_blank(),
+  panel.grid = element_blank(),
+  axis.line = element_line(color = "black"),
+  legend.key = element_rect(colour = "transparent", fill = "transparent")
+)
+
+
+termination.theme = theme(
+  # titles
+  axis.title.y = element_text(face = "bold", size = 24),
+  axis.title.x = element_text(face = "bold", size = 24),
+  # axis text
+  axis.text.x = element_text(size = 18),
+  axis.text.y = element_text(size = 18),
+  # facet text
+  strip.text = element_text(face = "bold", size = 18),
+  legend.text = element_text(size = 14),
+  # backgrounds, lines
+  panel.background = element_blank(),
+  strip.background = element_blank(),
+  panel.grid = element_blank(),
+  axis.line = element_line(color = "black"),
+  legend.key = element_rect(colour = "transparent", fill = "transparent"),
+  legend.position = "bottom"
+)
+
+
+containment.complexity.plot = function(mean.data, title = "", xlab = "", ylab = "") {
+  mean.data %>%
+    ggplot(aes(x = complexity, y = means)) +
+    geom_point(size = 5) +
+    geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+    scale_x_discrete(labels = COMPLEXITY_LABELS) +
+    facet_wrap(. ~ containment,
+               # scales = "free",
+               labeller = labeller(containment = CONTAINMENT_LABELS)) +
+    labs(x = xlab, y = ylab) +
+    ggtitle(title) +
+    default.theme
+}
+```
+
+
+#Empirical Data#
+The main question we were interested in was, given the empirical response time results below, is it possible that simulations would follow a similar pattern for the "easy" low and medium containment trials and that in the harder trials, we can account for people's slow (and inaccurate) answers through the simulations failing to terminate within a reasonable time frame?
+
+
+```{r human_responsetime, fig.height = 10, fig.width = 20, fig.align = "center", message = FALSE}
+data_humans = read.data("phystables_env_raw.csv")
+title = "Response time across complexity, containment levels"
+xlab = "Simulation complexity"
+ylab = "Mean response time (ms)"
+
+# Calculate means, CIs
+response_means = data_humans %>%
+  group_by(containment, complexity) %>%
+  summarize(means = mean(responsetime),
+            trials = n(),
+            se.lower = means - sd(responsetime) / sqrt(length(responsetime)),
+            se.upper = means + sd(responsetime) / sqrt(length(responsetime))) %>%
+  select(containment, complexity, means, trials, se.lower, se.upper)
+
+response_means %>%
+  ggplot(aes(x = complexity, y = means)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
+  scale_x_discrete(labels = COMPLEXITY_LABELS) +
+  facet_wrap(. ~ containment,
+             scales = "free",
+             labeller = labeller(containment = CONTAINMENT_LABELS)) +
+  scale_y_continuous(limits = c(250, 750), breaks = seq(250, 750, by = 250)) +
+  labs(x = xlab, y = ylab) +
+  ggtitle(title) +
+  default.theme
+```
+
+
+# Simulation Analysis: Termination #
+To answer the first question posed earlier, below is the proportion of trials that terminate (on y) within various time thresholds (on x), across each containment and complexity level, laid out similarly to the plot above except X is termination threshold and each line is a complexity level. There's a pretty clear story that emerges but it's sort of the opposite of our hypothesis above. 
+
+
+```{r termination_analysis, message = FALSE}
+term_data = read.data(SIM_DATA_FILEPATH)
+# add simulation time in ms, log simulation time (in ms)
+term_data$sim_time.ms = term_data$simulation_time * 1000
+term_data$log.sim_time.ms = log10(term_data$sim_time.ms)
+
+term_summary = data.frame(containment = character(),
+                          complexity = character(),
+                          containment_complexity = character(),
+                          complexity_containment = character(),
+                          threshold = numeric(),
+                          ntrials = numeric(),
+                          termination_trials = numeric(),
+                          termination_percent = numeric())
+
+for (threshold in seq(1:60)) {
+  term_summary = rbind(term_summary,
+                       term_data %>%
+                         group_by(containment, complexity) %>%
+                         summarize(
+                           containment_complexity = paste(unique(containment), unique(complexity), sep = "-"),
+                           complexity_containment = paste(unique(complexity), unique(containment), sep = "-"),
+                           threshold = threshold,
+                           ntrials = n(),
+                           termination_trials = sum(simulation_time <= threshold),
+                           termination_percent = termination_trials / ntrials) %>%
+                         as.data.frame()
+  )
+}
+```
+
+
+```{r termination_plot_containment, fig.height = 10, fig.width = 20, fig.align = "center"}
+term_summary %>%
+  ggplot(aes(x = threshold, y = termination_percent, color = containment_complexity)) +
+  geom_line() +
+  scale_color_viridis(discrete = T,
+                      name = element_blank(),
+                      labels = CONTAINMENT_COMPLEXITY_LABELS) +
+  labs(x = "Termination threshold (sec)", y = "Percent of trials") +
+  facet_wrap(. ~ containment,
+             scales = "free",
+             labeller = labeller(containment = CONTAINMENT_LABELS)) +
+  guides(color = guide_legend(ncol = 3)) +
+  termination.theme
+```
+
+
+The above is a summary of 200 simulations from each scenario, aggregated into buckets of containment/complexity. Fewer low containment trials terminate at each time threshold (up to 60 seconds) than medium or high containment. When I flip the graph above to display panels by complexity level, the pattern is even more clear.
+
+
+```{r termination_plot_complexity, fig.height = 10, fig.width = 20, fig.align = "center"}
+term_summary %>%
+  ggplot(aes(x = threshold, y = termination_percent, color = complexity_containment)) +
+  geom_line() +
+  scale_color_viridis(discrete = T,
+                      name = element_blank(),
+                      labels = COMPLEXITY_CONTAINMENT_LABELS) +
+  labs(x = "Termination threshold (sec)", y = "Percent of trials") +
+  facet_wrap(. ~ complexity,
+             scales = "free",
+             labeller = labeller(complexity = COMPLEXITY_LABELS_VERBOSE)) +
+  guides(color = guide_legend(ncol = 4)) +
+  termination.theme
+```
+
+
+Here, you can see that for any complexity level, more containment leads to higher probability of termination at every time threshold.
+
+So it doesn't appear that we can explain the difference between low and high containment response times (or accuracy) in terms of simulations failing to terminate, unless we increase the noise or something (more on that at the end). 
+
+
+# Simulation Analysis: Simulation Time #
+However, for various termination cutoffs that I set, the response time pattern does echo human results *within* a containment level: as complexity increases, response time goes up. The below is simulation data with a 10s, 30s, and 60s cutoff that all have more or less the same pattern. 
+
+One interpretation here is that people not only fail to use containment information usefully, but that maybe the feature processing of all those walls adds some fixed time penalty before simulations start. Not sure how compelling or testable that story is but if you add a "containment intercept" to the data below you get something pretty similar to the human response time data.
+
+
+```{r simtime_analysis}
+simtime_summary = data.frame(containment = character(), 
+                             complexity = character(),
+                             threshold = numeric(),
+                             means = numeric(), 
+                             trials = numeric(), 
+                             se.lower = numeric(), 
+                             se.upper = numeric())
+
+for (threshold in seq(1, 61, by = 10)) {
+  threshold_summary = term_data %>% 
+    filter(simulation_time < threshold)
+  summary_data = as.data.frame(get.simtime.se(threshold_summary))
+  summary_data$threshold = threshold
+  simtime_summary = rbind(simtime_summary,
+                          summary_data)
+}
+```
+
+
+```{r simtime_plots, fig.height = 10, fig.width = 20, fig.align = "center"}
+title = "Simulation times across complexity, containment levels"
+xlab = "Complexity level"
+ylab = "Mean simulation time (ms)"
+
+simtime_summary %>%
+  filter(threshold == 11) %>%
+  containment.complexity.plot(paste(title, " (10s termination cutoff)"), xlab, ylab)
+
+simtime_summary %>%
+  filter(threshold == 31) %>%
+  containment.complexity.plot(paste(title, " (30s termination cutoff)"), xlab, ylab)
+
+simtime_summary %>%
+  filter(threshold == 61) %>%
+  containment.complexity.plot(paste(title, " (60s termination cutoff)"), xlab, ylab)
+```
+
+
+# Next Steps #
+One possible next step here is to turn up the noise parameters in the simulation. I didn't modify those beyond the default values for the above but it's possible that by increasing them, we raise response times across high containment scenarios proportionally more than low containment ones. There are several different noise parameters in the simulation code and I don't have strong intuitions about which ones to fiddle with or how much, so before doing that I wanted to put this on both your radars and maybe schedule some time to talk more. Let me know if you have any questions or confusions about this!
+
+
+
+
+
+
+
