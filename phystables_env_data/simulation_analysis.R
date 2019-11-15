@@ -14,6 +14,7 @@ library(viridis)
 
 SIM_DATA_FILEPATH = "containment_sims.csv"
 TERMINATION_DATA_FILEPATH = "containment_sims_v2.csv"
+SIM_DATA_BRIEF = "containment_sims_short.csv"
 
 
 ##########################
@@ -44,10 +45,16 @@ read.data = function(filepath) {
 # Note these are copied over from `data_analysis_kitchen_sink.R`, may be
 # worth putting them in a general purpose library to source
 
+# CONTAINMENT_LABELS = c(
+#   l1 = "low containment",
+#   l2 = "medium containment",
+#   l3 = "high containment"
+# )
+
 CONTAINMENT_LABELS = c(
-  l1 = "low containment",
+  l1 = "high containment",
   l2 = "medium containment",
-  l3 = "high containment"
+  l3 = "low containment"
 )
 
 COMPLEXITY_LABELS = c(
@@ -88,9 +95,9 @@ containment.complexity.plot = function(mean.data, title = "", xlab = "", ylab = 
     geom_point(size = 5) +
     geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
     scale_x_discrete(labels = COMPLEXITY_LABELS) +
-    facet_wrap(. ~ containment,
+    facet_wrap(. ~ containment_f,
                # scales = "free",
-               labeller = labeller(containment = CONTAINMENT_LABELS)) +
+               labeller = labeller(containment_f = CONTAINMENT_LABELS)) +
     labs(x = xlab, y = ylab) +
     ggtitle(title) +
     default.theme
@@ -103,9 +110,9 @@ scenario.plot = function(mean.data, title = "", xlab = "", ylab = "") {
     geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.5) +
     scale_x_discrete(labels = COMPLEXITY_LABELS) +
     guides(color = FALSE) +
-    facet_grid(scenario ~ containment,
+    facet_grid(scenario ~ containment_f,
                scales = "free",
-               labeller = labeller(containment = CONTAINMENT_LABELS,
+               labeller = labeller(containment_f = CONTAINMENT_LABELS,
                                    scenario = SCENARIO_LABELS)) +
     labs(x = xlab, y = ylab) +
     ggtitle(title) +
@@ -121,6 +128,12 @@ scenario.plot = function(mean.data, title = "", xlab = "", ylab = "") {
 
 # data = read.data(SIM_DATA_FILEPATH)
 data = read.data(TERMINATION_DATA_FILEPATH)
+data = read.data(SIM_DATA_BRIEF)
+
+
+data = data %>%
+  mutate(containment_f = factor(containment, levels = c("l3", "l2", "l1")))
+
 
 # Remove non-terminated trials
 sim.data_5s = data %>%
@@ -144,17 +157,35 @@ ylab = "Mean simulation time (ms)"
 # simtime.means = sim.data_10s %>%
 # simtime.means = sim.data_30s %>%
 # simtime.means = sim.data_60s %>%
-simetime.means = get.containment.complexity.se(sim.data_30s)
+# simetime.means = get.containment.complexity.se(sim.data_30s)
 
 simtime.means = data %>%
-  group_by(containment, complexity) %>%
+  #filter(simulation_time <= 2.5) %>%
+  group_by(containment_f, complexity) %>%
   summarize(means = mean(sim_time.ms),
             trials = n(),
             se.lower = means - sqrt(var(sim_time.ms) / length(sim_time.ms)),
             se.upper = means + sqrt(var(sim_time.ms) / length(sim_time.ms))) %>%
-  select(containment, complexity, means, trials, se.lower, se.upper)
+  select(containment_f, complexity, means, trials, se.lower, se.upper)
 # Graph data
 containment.complexity.plot(simtime.means, title, xlab, ylab)
+
+
+# Scenario plot
+ylab = "Simulation time (ms)"
+data %>%
+  ggplot(aes(x = complexity, y = sim_time.ms, color = scenario)) +
+  geom_jitter(alpha = 0.25) +
+  scale_x_discrete(labels = COMPLEXITY_LABELS) +
+  facet_grid(scenario ~ containment_f,
+             # scales = "free",
+             labeller = labeller(containment_f = CONTAINMENT_LABELS,
+                                 scenario = SCENARIO_LABELS)) +
+  labs(x = xlab, y = ylab) +
+  #ggtitle(title) +
+  default.theme +
+  theme(legend.position = "none")
+
 
 
 ### LOG SIMTIME ### 
@@ -189,13 +220,13 @@ xlab = "Complexity level"
 ylab = "Mean bounces"
 
 # Calculate means, CIs
-bounce.means = sim.data %>%
-  group_by(containment, complexity) %>%
+bounce.means = data %>%
+  group_by(containment_f, complexity) %>%
   summarize(means = mean(bounces),
             trials = n(),
             se.lower = means - sqrt(var(bounces) / length(bounces)),
             se.upper = means + sqrt(var(bounces) / length(bounces))) %>%
-  select(containment, complexity, means, trials, se.lower, se.upper)
+  select(containment_f, complexity, means, trials, se.lower, se.upper)
 # Graph data
 containment.complexity.plot(bounce.means, title, xlab, ylab)
 
