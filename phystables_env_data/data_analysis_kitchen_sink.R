@@ -14,25 +14,10 @@ length(levels(as.factor(data$subjID)))
 ########################################
 
 # Handle response time for "no response" rows by setting to 10s
-data.no.resp = data %>%
-  filter(responsetime == -1)
-table(data.no.resp$subjID)
-
 data$responsetime[data$responsetime == -1] = 10 * 1000
 
 # Handle 0s responsetime trials by setting to 1s
-data.immediate.resp = data %>%
-  filter(responsetime == 0)
-table(data.immediate.resp$subjID)
-
 data$responsetime[data$responsetime == 0] = 1
-
-
-# Do we have 256 observations for each participant?
-# Do we have equal sc1, sc2, sc3, and sc4 for each participant?
-# Do we have equal containment l1, l2, l3 for each participant?
-# Do we have equal complexity l1, l2, l3, l4 for each participant?
-
 
 
 
@@ -158,10 +143,16 @@ data %>%
 ### ANALYSIS FUNCTIONS ###
 ##########################
 
+# containment_labels = c(
+#   l1 = "low containment",
+#   l2 = "medium containment",
+#   l3 = "high containment"
+# )
+
 containment_labels = c(
-  l1 = "low containment",
+  l1 = "high containment",
   l2 = "medium containment",
-  l3 = "high containment"
+  l3 = "low containment"
 )
 
 complexity_labels = c(
@@ -290,25 +281,28 @@ ylab = "Mean response time (ms)"
 
 # Calculate means, CIs
 responsetime.means = data %>%
-  group_by(containment, complexity) %>%
+  # filter(rotation == "distractor") %>%
+  mutate(containment_f = factor(containment, levels = c("l3", "l2", "l1"))) %>%
+  filter(rotation %in% c("NONE", "LEFT", "RIGHT", "TWICE")) %>%
+  group_by(containment_f, complexity) %>%
   summarize(means = mean(responsetime),
             trials = n(),
-            se.lower = means - sqrt(var(responsetime) / length(responsetime)),
-            se.upper = means + sqrt(var(responsetime) / length(responsetime))) %>%
-  select(containment, complexity, means, trials, se.lower, se.upper)
+            se.lower = means - (sd(responsetime) / sqrt(n())),
+            se.upper = means + (sd(responsetime) / sqrt(n()))) %>%
+  select(containment_f, complexity, means, trials, se.lower, se.upper)
 # Graph data
 make.canonical.bargraph(responsetime.means, title, xlab, ylab)
 
 # Graph as dot with errors
 responsetime.means %>%
+  #fct_reorder(containment, .desc = TRUE) %>%
   ggplot(aes(x = complexity, y = means)) +
   geom_point(size = 5) +
   geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
   scale_x_discrete(labels = complexity_labels) +
-  facet_wrap(. ~ containment,
-             scales = "free",
-             labeller = labeller(containment = containment_labels)) +
-  scale_y_continuous(limits = c(250, 750), breaks = seq(250, 750, by = 250)) +
+  facet_wrap(. ~ containment_f,
+             labeller = labeller(containment_f = containment_labels)) +
+  scale_y_continuous(limits = c(300, 700), breaks = seq(300, 700, by = 100)) +
   labs(x = xlab, y = ylab) +
   #ggtitle(title) +
   default.theme
@@ -388,12 +382,13 @@ ylab = "Mean response time (ms)"
 
 # Calculate means, CIs
 responsetime.scenario.means = data %>%
-  group_by(scenario, containment, complexity) %>%
+  mutate(containment_f = factor(containment, levels = c("l3", "l2", "l1"))) %>%
+  group_by(scenario, containment_f, complexity) %>%
   summarize(means = mean(responsetime),
             trials = n(),
             se.lower = means - sqrt(var(responsetime) / length(responsetime)),
             se.upper = means + sqrt(var(responsetime) / length(responsetime))) %>%
-  select(scenario, containment, complexity, means, trials, se.lower, se.upper)
+  select(scenario, containment_f, complexity, means, trials, se.lower, se.upper)
 # Graph data
 make.canonical.bargraph.scenario(responsetime.scenario.means, title, xlab, ylab)
 
@@ -408,9 +403,9 @@ responsetime.scenario.means %>%
   scale_x_discrete(labels = complexity_labels) +
   guides(color = FALSE) +
   scale_y_continuous(limits = c(300, 900), breaks = seq(300, 900, by = 200)) +
-  facet_grid(scenario ~ containment,
+  facet_grid(scenario ~ containment_f,
              scales = "free",
-             labeller = labeller(containment = containment_labels,
+             labeller = labeller(containment_f = containment_labels,
                                  scenario = scenario_labels)) +
   labs(x = xlab, y = ylab) +
   #ggtitle(title) +
@@ -508,14 +503,15 @@ participant.accuracy.means = data %>%
 
 # Calculate means, CIs
 accuracy.means = participant.accuracy.means %>%
-  group_by(containment, complexity) %>%
+  mutate(containment_f = factor(containment, levels = c("l3", "l2", "l1"))) %>%
+  group_by(containment_f, complexity) %>%
   summarize(means = mean(accuracy),
             trials = n(),
             se.lower = means - sqrt(var(accuracy) / length(accuracy)),
             se.upper = means + sqrt(var(accuracy) / length(accuracy)),
             ci.lower = t.test(accuracy)$conf.int[1],
             ci.upper = t.test(accuracy)$conf.int[2]) %>%
-  select(containment, complexity, means, trials, se.lower, se.upper, ci.lower, ci.upper)
+  select(containment_f, complexity, means, trials, se.lower, se.upper, ci.lower, ci.upper)
 # Graph data
 # accuracy dotplot (no general expression for this because scale_y is unique)
 accuracy.means %>%
@@ -537,10 +533,10 @@ accuracy.means %>%
   geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0.25) +
   scale_x_discrete(labels = complexity_labels) +
   geom_hline(aes(yintercept = 0.5), linetype = "dashed") +
-  facet_wrap(. ~ containment,
-             scales = "free",
-             labeller = labeller(containment = containment_labels)) +
-  scale_y_continuous(limits = c(0.5, 1), breaks = seq(0, 1, by = 0.1)) +
+  facet_wrap(. ~ containment_f,
+             #scales = "free",
+             labeller = labeller(containment_f = containment_labels)) +
+  scale_y_continuous(limits = c(0.5, 0.9), breaks = seq(0, 0.9, by = 0.1)) +
   labs(x = xlab, y = ylab) +
   #ggtitle(title) +
   default.theme
