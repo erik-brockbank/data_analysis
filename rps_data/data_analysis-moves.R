@@ -13,7 +13,6 @@ rm(list = ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
 
 source('data_processing.R') # script used for data processing/cleanup
-glimpse(data)
 
 
 PLAYER_SET = unique(data$player_id)
@@ -569,8 +568,8 @@ ENTROPY_SUMMARY %>%
                       labels = graph.labels,
                       guide = guide_legend(nrow = length(unique(ENTROPY_SUMMARY$entropy.type)))) +
   individ_plot_theme +
-  theme(plot.title = element_text(face = "bold", size = 20)) +
-  theme(axis.text.x = element_blank())
+  theme(plot.title = element_text(face = "bold", size = 20),
+        axis.text.x = element_blank())
 
 
 ENTROPY_SUMMARY %>%

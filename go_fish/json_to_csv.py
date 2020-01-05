@@ -12,11 +12,11 @@ from os.path import isfile, join
 """
 
 # TODO data worth adding at some point
-# - More fine grained time on experiment components (not just overall completion time)
+# - More fine grained time on experiment components (e.g. time on each individual prediction trial)
 # - Additional bool in eval task for whether something was a distractor rule
 # - More data in memory task: what order was each item, when was it shown
 
-EXPERIMENT = "go_fish_pilot_web" # useful identifier for experiment data
+EXPERIMENT = "go_fish_web" # useful identifier for experiment data
 DATA_PATH = "/Users/erikbrockbank/web/go_fish/data/" # path to data files
 
 OUTPUT_FILE_SUMMARY = "01_{}_meta.csv".format(EXPERIMENT)

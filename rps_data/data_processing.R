@@ -15,9 +15,12 @@ library(tidyverse)
 library(viridis)
 
 
-DATA_FILE = "rps_raw.csv" # name of file containing full dataset for all rounds
+PILOT_DATA_FILE = "rps_pilot.csv" # name of file containing full dataset for all *pilot* rounds
+DATA_FILE = "rps_data.csv" # name of file containing full dataset for all rounds
+# Participant IDs who played only 100 rounds (NB: this applies to pilot data only)
 SHORT_ROUND_PLAYERS = c("6ac3a837-c8cc-4bd0-9cd9-40d6dcd6c0c1", "960a15dd-c442-4693-a55d-0096fe8c14b3",
                         "c45e2174-9181-43a9-a834-c918c4201273", "dd051569-60c1-43c6-8691-f49a47008cd8")
+
 
 #######################
 ### DATA PROCESSING ###
@@ -104,6 +107,18 @@ plot.rt = function(data) {
     theme(axis.text.x = element_blank())
 }
 
+# Investigate how much time each player spent viewing results of each round
+plot.outcome.viewtime = function(data) {
+  data %>%
+    ggplot(aes(x = player_id, y = player_outcome_viewtime)) +
+    geom_jitter(alpha = 0.5, size = 0.8, width = 0.25, color = "blue") +
+    mylogy(c(1, 10000)) +
+    labs(x = "Participant", y = "RT (ms)") +
+    ggtitle("Outcome viewing times by participant") +
+    individ_plot_theme +
+    theme(axis.text.x = element_blank())
+}
+
 # Check that each player's response times stay relatively consistent over the experiment
 plot.rt.sequence = function(data) {
   quartile.data = data %>%
@@ -135,21 +150,19 @@ plot.moves = function(data) {
   
   move.summary %>%
     ggplot(aes(x = player_move, y = move_pct)) +
-    geom_bar(stat = "identity", width = 0.5) +
+    geom_bar(stat = "identity", width = 0.5, color = "blue", fill = "blue", alpha = 0.5) +
     geom_hline(yintercept = 0.33, linetype = "dashed", color = "red") +
     labs(x = "", y = "") +
     ggtitle("Move percentage by participant") +
     individ_plot_theme +
-    facet_wrap(~participant_abbrev, scales = "free_y", ncol = 5)
+    facet_wrap(~participant_abbrev, ncol = 5)
 }
 
 # Check how well-matched players were in each dyad
 plot.outcomes = function(data) {
-  
   outcome.summary = data %>%
     group_by(game_id, round_index) %>%
-    #arrange(round_index) %>%
-    filter(row_number()==1) %>%
+    filter(row_number() == 1) %>%
     ungroup() %>%
     group_by(game_id) %>%
     count(player_outcome) %>%
@@ -159,7 +172,7 @@ plot.outcomes = function(data) {
   
   outcome.summary %>%
     ggplot(aes(x = player_outcome, y = outcome_pct)) +
-    geom_bar(stat = "identity", width = 0.5) +
+    geom_bar(stat = "identity", width = 0.5, color = "blue", fill = "blue", alpha = 0.5) +
     geom_hline(yintercept = 0.33, linetype = "dashed", color = "red") +
     labs(x = "", y = "") +
     ggtitle("Outcome percentage by dyad") +
@@ -167,6 +180,23 @@ plot.outcomes = function(data) {
     scale_x_discrete(name = element_blank(),
                      labels = c("win" = "win:loss", "loss" = "loss:win", "tie" = "tie:tie")) +
     facet_wrap(~game_id_abbrev, ncol = 5)
+}
+
+# Check final score differentials for each dyad to see if anybody did so horribly that the data is suspect
+plot.score.differentials = function(data) {
+  score_diff = data %>%
+    group_by(game_id) %>%
+    filter(round_index == max(round_index)) %>%
+    mutate(final_score = player_total + player_points,
+           point_diff = abs(final_score - lag(final_score, 1))) %>%
+    filter(!is.na(point_diff)) %>%
+    select(game_id, point_diff)
+  
+  score_diff %>%
+    ggplot(aes(x = point_diff)) +
+    geom_histogram(binwidth = 50, color = "blue", fill = "blue", alpha = 0.5) +
+    labs(x = "Dyad score differentials") +
+    individ_plot_theme
 }
 
 
@@ -198,30 +228,13 @@ plot.move.sequence = function(data) {
     ggplot(aes(x = subset, y = entropy)) +
     geom_line() +
     labs(x = "", y = "Shannon entropy (S)") +
-    ggtitle("Entropy of participant moves over trial segments") +
+    ggtitle("Move entropy by participant over game deciles") +
     individ_plot_theme +
-    facet_wrap(~participant_abbrev, scales = "free_y", ncol = 5) +
+    facet_wrap(~participant_abbrev, ncol = 5) +
     scale_x_continuous(name = element_blank(), breaks = seq(0, 10, 2))
 }
 
-# Check that no player did so terribly that we should be suspicious of whether they were trying
-# (this should show up in the RT and move choices as well)
-plot.scores = function(data) {
-  score.summary = data %>%
-    group_by(player_id) %>%
-    filter(round_index == max(round_index)) %>%
-    mutate(final_score = player_total + player_points) %>%
-    select(player_id, final_score)
-  
-  print(score.summary)
-  
-  score.summary %>%
-    ggplot(aes(x = final_score)) +
-    geom_histogram(binwidth = 10) +
-    labs(x = "Participant scores") +
-    ggtitle("Distribution of participant final scores") +
-    individ_plot_theme
-}
+
 
 
 
@@ -230,15 +243,17 @@ plot.scores = function(data) {
 ################
 
 # Read in data
-data = read.data(DATA_FILE)
-
-# Overview of data
+data = read.data(PILOT_DATA_FILE)
+# data = read.data(DATA_FILE)
 glimpse(data)
-table(data$player_id)
-
 
 ### Response times ###
+# Response time when choosing moves
 plot.rt(data) # 100 trial participants look a lot like 300 trial participants
+# Response time when proceeding to next round after viewing results
+# NB: this won't work for pilot data
+plot.outcome.viewtime(data)
+
 sort(data$player_rt)[1:50] # we have some very low RTs: should we exclude all < 800ms?
 plot.rt.sequence(data) # by quartile, people do seem to be going faster: are they caring less?
 
@@ -246,99 +261,23 @@ plot.rt.sequence(data) # by quartile, people do seem to be going faster: are the
 ### Move choices ###
 plot.moves(data) # some of these people don't appear to have a stable balance of R, P, S: did they stop trying?
 
-chisq_tests = data.frame(player_id = character(), chisq = numeric(), p_val = numeric())
-for (player in unique(data$player_id)) {
-  subj.data = data %>%
-    filter(player_id == player,
-           player_move %in% c("rock", "paper", "scissors"))
-  tst = chisq.test(table(subj.data$player_move))
-  chisq_tests = rbind(chisq_tests, data.frame(player_id = player, chisq = tst$statistic, p_val = tst$p.value))
-}
-chisq_tests # several of these are highly significant: people are not choosing an even balance of R, P, S
-
 
 ### Outcomes ###
 plot.outcomes(data) # No players appear wildly mismatched, though score differential does suggest there may have been a couple
 
 
+
 ### Scores ###
-plot.scores(data) 
-# for 100 rounds, max: 300; min: -100; expected: 66
-# for 300 rounds, max: 900; min: -300; expected: 200
-# Look at final point differentials by dyad to see what distribution of point differences looked like
-data %>%
-  group_by(game_id) %>%
-  filter(round_index == max(round_index)) %>%
-  mutate(final_score = player_total + player_points,
-         point_diff = abs(final_score - lag(final_score, 1))) %>%
-  filter(!is.na(point_diff)) %>%
-  select(game_id, point_diff)
+# Final score differentials for each dyad
+plot.score.differentials(data)
 
 
 ### Effort ###
 # Are people trying throughout the experiment?
-# Note this should also be reflected in the response times
-plot.move.sequence(data) # entropy wobbles around by decile but doesnt appear to fall off a cliff for anybody
+# entropy wobbles around by decile but doesnt appear to fall off a cliff for anybody (min is 1.2)
+plot.move.sequence(data)
 
 
 
 
-# TODO plot score as 1, -1, 0 then take the highest ones in each dyad to get a sense of whether anybody is reliably winning
-# can also plot 1, -1, 0 for each person over time to see if somebody "figures their opponent out" (look for long sequences at 1 or -1)
-
-
-# ANALYSIS: are the percentage of 3-move sequences what we would expect from a random player?
-seq.counts3 = data %>%
-  group_by(player_id) %>%
-  mutate(prev.move = lag(player_move, 1), # one move back (previous move)
-         prev.move2 = lag(player_move, 2), # two moves back
-         prev.move3 = lag(player_move, 3)) %>% # three moves back
-  filter(!is.na(prev.move), !is.na(prev.move2), !is.na(prev.move3), # lag calls above set NA for lag on first three moves: ignore it here
-         player_move != "none", prev.move != "none", prev.move2 != "none", prev.move3 != "none") %>%
-  group_by(player_id, round_index) %>%
-  mutate(rock.count = sum(prev.move == "rock", prev.move2 == "rock", prev.move3 == "rock"),
-         paper.count = sum(prev.move == "paper", prev.move2 == "paper", prev.move3 == "paper"),
-         scissors.count = sum(prev.move == "scissors", prev.move2 == "scissors", prev.move3 == "scissors"),
-         min.col = min(c(rock.count, paper.count, scissors.count)),
-         mid.col = median(c(rock.count, paper.count, scissors.count)),
-         max.col = max(c(rock.count, paper.count, scissors.count)),
-         seq.type = paste(min.col, mid.col, max.col, sep = "-")) %>%
-  ungroup() %>%
-  count(seq.type) %>%
-  mutate(pct = n / sum(n))
-
-seq.counts3
-chisq.test(seq.counts3$n, p = c((1/9), (6/9), (2/9)))
-
-
-
-seq.counts1 = data %>%
-  filter(player_move != "none") %>%
-  count(player_move)
-
-seq.counts1
-chisq.test(x = seq.counts1$n, p = c(1/3, 1/3, 1/3))
-
-
-seq.counts2 = data %>%
-  group_by(player_id) %>%
-  mutate(prev.move = lag(player_move, 1), # one move back (previous move)
-         prev.move2 = lag(player_move, 2)) %>% # two moves back
-  filter(!is.na(prev.move), !is.na(prev.move2), # lag calls above set NA for lag on first two moves: ignore it here
-         player_move != "none", prev.move != "none", prev.move2 != "none") %>%
-  group_by(player_id, round_index) %>%
-  mutate(rock.count = sum(prev.move == "rock", prev.move2 == "rock"),
-         paper.count = sum(prev.move == "paper", prev.move2 == "paper"),
-         scissors.count = sum(prev.move == "scissors", prev.move2 == "scissors"),
-         min.col = min(c(rock.count, paper.count, scissors.count)),
-         mid.col = median(c(rock.count, paper.count, scissors.count)),
-         max.col = max(c(rock.count, paper.count, scissors.count)),
-         seq.type = paste(min.col, mid.col, max.col, sep = "-")) %>%
-  #as.data.frame() %>%
-  ungroup() %>%
-  count(seq.type) %>%
-  mutate(pct = n / sum(n))
-
-seq.counts2
-chisq.test(x = seq.counts2$n, p = c(1/3, 2/3))
 
