@@ -23,9 +23,8 @@
 rm(list = ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
 
-source('data_processing.R') # script used for data processing/cleanup
+#source('data_processing.R') # script used for data processing/cleanup
 source('data_analysis-moves.R') # script used for calculating entropy over move distributions
-glimpse(data)
 
 
 PLAYER_SET = unique(data$player_id)
@@ -832,6 +831,7 @@ player.transition.opponent.prev.2transition.entropy = opponent.prev.2transition 
   summarize(transition.entropy.2.opponent.prev.2transition = sum(opponent.prev.2transition.entropy.norm))
 
 
+
 ###############
 ### SUMMARY ###
 ###############
@@ -868,8 +868,8 @@ ENTROPY_SUMMARY %>%
                       labels = graph.labels,
                       guide = guide_legend(nrow = length(unique(ENTROPY_SUMMARY$entropy.type)))) +
   individ_plot_theme +
-  theme(plot.title = element_text(face = "bold", size = 20)) +
-  theme(axis.text.x = element_blank())
+  theme(plot.title = element_text(face = "bold", size = 20),
+        axis.text.x = element_blank())
 
 
 ENTROPY_SUMMARY %>%
@@ -899,7 +899,6 @@ ENTROPY_SUMMARY_FINAL = player.entropy %>%
   # move distributions
   left_join(player.prev.move.entropy, by = "player_id") %>%
   left_join(opponent.prev.move.entropy, by = "player_id") %>%
-  #left_join(player.opponent.prev.move.entropy, by = "player_id") %>%
   left_join(player.prev.2move.entropy, by = "player_id") %>%
   # transition distributions
   left_join(player.transition.entropy, by = "player_id") %>%
@@ -911,7 +910,6 @@ legend.width = 45
 graph.labels.final = c("entropy.0" = str_wrap("Overall distribution of moves ('rock', 'paper', 'scissors')", legend.width), 
                        "entropy.1.player" = str_wrap("Distribution of moves given player's previous move", legend.width),
                        "entropy.1.opponent" = str_wrap("Distribution of moves given opponent's previous move", legend.width),
-                       #"entropy.2.player.opponent" = str_wrap("Distribution of moves given player's previous move, opponent's previous move", legend.width),
                        "entropy.2.player" = str_wrap("Distribution of moves given player's previous two moves", legend.width),
                        "transition.entropy.0" = str_wrap("Distribution of transitions ('+', '-', '0')", legend.width),
                        "transition.entropy.1.player.outcome" = str_wrap("Distribution of transitions given player's previous outcome ('win', 'tie', 'loss')", legend.width))
@@ -938,7 +936,12 @@ ENTROPY_SUMMARY_FINAL %>%
   theme(axis.text.x = element_blank(),
         axis.text.y = element_text(size = 20, face = "bold", angle = 45),
         axis.title.y = element_text(size = 28, face = "bold"),
-        legend.position = "none",
+        # legend.position = "none",
+        legend.position = "right",
         legend.key.height = unit(2, 'cm'),
         legend.key.width = unit(1, 'cm'),
         legend.key = element_rect(fill = NA))
+
+
+
+
