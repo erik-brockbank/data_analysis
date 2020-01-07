@@ -17,6 +17,8 @@ library(viridis)
 
 PILOT_DATA_FILE = "rps_pilot.csv" # name of file containing full dataset for all *pilot* rounds
 DATA_FILE = "rps_data.csv" # name of file containing full dataset for all rounds
+FREE_RESP_FILE = "rps_data_freeResp.csv" # name of file containing free response data by participant
+SLIDER_FILE = "rps_data_sliderData.csv" # name of file containing slider Likert data by participant
 # Participant IDs who played only 100 rounds (NB: this applies to pilot data only)
 SHORT_ROUND_PLAYERS = c("6ac3a837-c8cc-4bd0-9cd9-40d6dcd6c0c1", "960a15dd-c442-4693-a55d-0096fe8c14b3",
                         "c45e2174-9181-43a9-a834-c918c4201273", "dd051569-60c1-43c6-8691-f49a47008cd8")
@@ -243,8 +245,8 @@ plot.move.sequence = function(data) {
 ################
 
 # Read in data
-data = read.data(PILOT_DATA_FILE)
-# data = read.data(DATA_FILE)
+# data = read.data(PILOT_DATA_FILE)
+data = read.data(DATA_FILE)
 glimpse(data)
 
 ### Response times ###
@@ -276,6 +278,36 @@ plot.score.differentials(data)
 # Are people trying throughout the experiment?
 # entropy wobbles around by decile but doesnt appear to fall off a cliff for anybody (min is 1.2)
 plot.move.sequence(data)
+
+
+
+###################
+### SURVEY DATA ###
+###################
+
+fr_data = read.data(FREE_RESP_FILE)
+slider_data = read.data(SLIDER_FILE)
+glimpse(slider_data)
+
+### Free response answers ###
+fr_data$free_resp_answer # any notable responses here?
+
+
+### Likert slider data ###
+slider_data %>%
+  ggplot(aes(x = statement, y = resp, color = str_wrap(statement, width = 45))) +
+  geom_jitter(width = 0.25, alpha = 0.75) +
+  labs(x = "Slider statement", y = "Response (1-7; Strongly Disagree-Strongly Agree)") +
+  individ_plot_theme +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        legend.position = "right",
+        legend.text = element_text(size = 11, face = "italic"),
+        legend.title = element_blank()) +
+  scale_color_viridis(discrete = T)
+
+# TODO make mean+SEM plot of the above
+
 
 
 
