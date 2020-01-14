@@ -4,7 +4,7 @@
 
 
 rm(list = ls())
-setwd("~/web/vullab/data_analysis/go_fish")
+setwd("~/web/vullab/data_analysis/go_fish/pilot")
 
 library(tidyverse)
 library(viridis)
@@ -14,12 +14,12 @@ library(expss)
 
 # GLOBALS ======================================================================
 
-SUMMARY_DATA = "01_go_fish_pilot_web_meta.csv"
-TRIAL_DATA = "02_go_fish_pilot_web_trials.csv"
-GENERATION_RESP_DATA = "03_go_fish_pilot_web_generation_free_resp.csv"
-GENERATION_JUDG_DATA = "04_go_fish_pilot_web_generation_judgment.csv"
-EVAL_DATA = "05_go_fish_pilot_web_evaluation.csv"
-MEMORY_DATA = "06_go_fish_pilot_web_memory.csv"
+SUMMARY_DATA = "01_go_fish_pilot_meta.csv"
+TRIAL_DATA = "02_go_fish_pilot_trials.csv"
+GENERATION_RESP_DATA = "03_go_fish_pilot_generation_free_resp.csv"
+GENERATION_JUDG_DATA = "04_go_fish_pilot_generation_judgment.csv"
+EVAL_DATA = "05_go_fish_pilot_evaluation.csv"
+MEMORY_DATA = "06_go_fish_pilot_memory.csv"
 
 CONDITION_LABELS = c("TRUE" = "describe", "FALSE" = "explain")
 RULE_EVAL_LABELS = c("TRUE" = "target rule", "FALSE" = "all other rules")
@@ -30,7 +30,6 @@ RULE_EVAL_LABELS = c("TRUE" = "target rule", "FALSE" = "all other rules")
 
 read_data = function(filepath) {
   data = read_csv(filepath)
-  
   return(data)
 }
 
@@ -41,7 +40,6 @@ get_prediction_summary = function(prediction_data) {
              (input_prediction_catches_fish == prediction_catches_fish)) %>%
     group_by(is_control, trial_index) %>%
     summarize(mean_accuracy = sum(input_correct) / n())
-  
   return(prediction_summary)
 }
 
@@ -59,7 +57,6 @@ get_generation_judg_summary = function(generation_judg) {
               se_accuracy = sd(subj_accuracy) / sqrt(n()),
               ci_lower = mean_accuracy - se_accuracy,
               ci_upper = mean_accuracy + se_accuracy)
-    
   return(generation_judg_summary)
 }
 
@@ -100,7 +97,6 @@ get_time_summary = function(time_data) {
               se_task_time = sd(experiment_completion_time) / sqrt(n()),
               ci_lower = mean_task_time - se_task_time,
               ci_upper = mean_task_time + se_task_time)
-  
   return(time_summary)
 }
 
@@ -118,7 +114,6 @@ get_memory_summary = function(memory_data) {
               se_memory_accuracy = sd(subj_accuracy) / sqrt(n()),
               ci_lower = mean_memory_accuracy - se_memory_accuracy,
               ci_upper = mean_memory_accuracy + se_memory_accuracy)
-  
   return(memory_summary)
 }
 
