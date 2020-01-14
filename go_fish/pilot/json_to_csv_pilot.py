@@ -6,8 +6,8 @@ from os.path import isfile, join
 
 """
     To run this:
-    cd to data_analysis/go_fish
-    python json_to_csv.py
+    cd to data_analysis/go_fish/pilot
+    python json_to_csv_pilot.py
     Outputs: csv files listed below
 """
 
@@ -15,8 +15,8 @@ from os.path import isfile, join
 # - Additional bool in eval task for whether something was a distractor rule
 # - More data in memory task: what order was each item, when was it shown
 
-EXPERIMENT = "go_fish" # useful identifier for experiment data
-DATA_PATH = "/Users/erikbrockbank/web/go_fish/data/" # path to data files
+EXPERIMENT = "go_fish_pilot" # useful identifier for experiment data
+DATA_PATH = "/Users/erikbrockbank/web/go_fish/data/pilot/" # path to data files
 
 OUTPUT_FILE_SUMMARY = "01_{}_meta.csv".format(EXPERIMENT)
 OUTPUT_FILE_TRIALS = "02_{}_trials.csv".format(EXPERIMENT)
