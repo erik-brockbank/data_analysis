@@ -20,11 +20,8 @@
 
 
 
-rm(list = ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
-
-#source('data_processing.R') # script used for data processing/cleanup
-source('data_analysis-moves.R') # script used for calculating entropy over move distributions
+source('01_data_analysis-move_entropy.R') # script used for calculating entropy over move distributions
 
 
 PLAYER_SET = unique(data$player_id)

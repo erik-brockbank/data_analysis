@@ -10,10 +10,9 @@
 
 # SETUP ========================================================================
 
-rm(list = ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
+source('01_data_analysis-move_entropy.R') # may need 02 as well (instead)
 
-source('data_processing.R') # script used for data processing/cleanup
 
 DISCOUNT_FCTR = 0.9
 # TODO confirm that our 1 was added to everything in other entropy analyses, not just 0 entries?
@@ -59,8 +58,8 @@ plot_entropy_individ = function(data) {
     geom_line(color = "blue") +
     facet_wrap(~participant_abbrev, ncol = 5) +
     labs(x = "Round", y = "Entropy (S) of moves") +
-    plot_theme +
-    text_theme
+    plot_theme
+    #text_theme 
 }
 
 
@@ -74,19 +73,27 @@ get_weighted_move_counts = function(data) {
     subj_dat = data %>%
       filter(player_id == participant) %>%
       select(game_id, player_id, round_index, player_move) %>%
-      mutate(rock_count = as.numeric(player_move == "rock"),
-             paper_count = as.numeric(player_move == "paper"),
-             scissors_count = as.numeric(player_move == "scissors"),
-             rock_count_wt = rock_count + SMOOTHING_FCTR,  # smoothing factor for 0 entries
-             paper_count_wt = paper_count + SMOOTHING_FCTR, # smoothing factor for 0 entries
-             scissors_count_wt = scissors_count + SMOOTHING_FCTR) # smoothing factor for 0 entries
+      mutate(rock_bool = as.numeric(player_move == "rock"),
+             paper_bool = as.numeric(player_move == "paper"),
+             scissors_bool = as.numeric(player_move == "scissors"),
+             rock_count_wt = rock_bool,
+             paper_count_wt = paper_bool,
+             scissors_count_wt = scissors_bool,
+             rock_count_smooth = rock_count_wt + SMOOTHING_FCTR, # smoothing factor for 0 entries
+             paper_count_smooth = paper_count_wt + SMOOTHING_FCTR, # smoothing factor for 0 entries
+             scissors_count_smooth = scissors_count_wt + SMOOTHING_FCTR # smoothing factor for 0 entries
+             )
     # Update weighted count columns for each round index
     # TODO can we avoid iterating here? ...
     for (round in seq(2, max(subj_dat$round_index))) {
       # xt = lambda * xt-1 + yt
-      subj_dat$rock_count_wt[round] = DISCOUNT_FCTR * subj_dat$rock_count_wt[round - 1] + subj_dat$rock_count[round] # TODO add smoothing factor each round here? 
-      subj_dat$paper_count_wt[round] = DISCOUNT_FCTR * subj_dat$paper_count_wt[round - 1] + subj_dat$paper_count[round]
-      subj_dat$scissors_count_wt[round] = DISCOUNT_FCTR * subj_dat$scissors_count_wt[round - 1] + subj_dat$scissors_count[round]
+      subj_dat$rock_count_wt[round] = DISCOUNT_FCTR * subj_dat$rock_count_wt[round - 1] + subj_dat$rock_bool[round]
+      subj_dat$paper_count_wt[round] = DISCOUNT_FCTR * subj_dat$paper_count_wt[round - 1] + subj_dat$paper_bool[round]
+      subj_dat$scissors_count_wt[round] = DISCOUNT_FCTR * subj_dat$scissors_count_wt[round - 1] + subj_dat$scissors_bool[round]
+      # Add smoothing factor to weighted updates
+      subj_dat$rock_count_smooth[round] = subj_dat$rock_count_wt[round] + SMOOTHING_FCTR
+      subj_dat$paper_count_smooth[round] = subj_dat$paper_count_wt[round] + SMOOTHING_FCTR
+      subj_dat$scissors_count_smooth[round] = subj_dat$scissors_count_wt[round] + SMOOTHING_FCTR
     }
     newdat = rbind(newdat, as.data.frame(subj_dat))
   }
@@ -98,10 +105,10 @@ get_weighted_move_counts = function(data) {
 get_weighted_move_entropy = function(data) {
   data = data %>%
     group_by(player_id, round_index) %>%
-    mutate(weighted_count_sum = sum(rock_count_wt, paper_count_wt, scissors_count_wt),
-           p_rock = rock_count_wt / weighted_count_sum,
-           p_paper = paper_count_wt / weighted_count_sum,
-           p_scissors = scissors_count_wt / weighted_count_sum,
+    mutate(weighted_count_sum = sum(rock_count_smooth, paper_count_smooth, scissors_count_smooth),
+           p_rock = rock_count_smooth / weighted_count_sum,
+           p_paper = paper_count_smooth / weighted_count_sum,
+           p_scissors = scissors_count_smooth / weighted_count_sum,
            entropy_moves = -sum(p_rock * log2(p_rock),
                                 p_paper * log2(p_paper),
                                 p_scissors * log2(p_scissors)))
@@ -141,7 +148,7 @@ get_weighted_move_counts_prev_move = function(data) {
     
     # Update weighted count columns for each round
     # TODO can we avoid iterating here? ...
-    for (round in seq(2, max(subj_dat$round_index))) {
+    for (round in seq(3, max(subj_dat$round_index))) {
       # xt = lambda * xt-1 + yt
       subj_dat$rock_rock_count_wt[round] = DISCOUNT_FCTR * subj_dat$rock_rock_count_wt[round - 1] + subj_dat$rock_rock_count[round] # TODO add smoothing factor each round here? 
       subj_dat$rock_paper_count_wt[round] = DISCOUNT_FCTR * subj_dat$rock_paper_count_wt[round - 1] + subj_dat$rock_paper_count[round]
@@ -165,6 +172,7 @@ get_weighted_move_counts_prev_move = function(data) {
 # This fxn follows a simliar format to `get_weighted_move_entropy`
 get_weighted_move_entropy_prev_move = function(data) {
   data = data %>%
+    filter(!is.na(prev_move)) %>%
     group_by(player_id, round_index) %>%
            # Total weighted count of previous move rock, paper, and scissors
     mutate(weighted_count_sum_rock = sum(rock_rock_count_wt, paper_rock_count_wt, scissors_rock_count_wt),
@@ -200,8 +208,27 @@ get_weighted_move_entropy_prev_move = function(data) {
 # -> get each participant's entropy per round for weighted probability of each move
 newdat_moves = get_weighted_move_counts(data)
 move_entropy = get_weighted_move_entropy(newdat_moves)
+# TODO "none" moves create NA entropy values for all subsequent rounds. What to do about this?
+
+# Graphs
 plot_entropy_individ(move_entropy)
-# TODO plot entropy across participants w/ error bars
+
+move_entropy %>%
+  group_by(player_id) %>%
+  summarize(mean_ent = mean(entropy_moves, na.rm = T),
+            vals = n(),
+            se = sd(entropy_moves, na.rm = T) / sqrt(vals),
+            ci.lower = mean_ent - se,
+            ci.upper = mean_ent + se) %>%
+  ggplot(aes(x = player_id, y = mean_ent)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper)) +
+  geom_point(data = player.entropy, aes(x = player_id, y = entropy.0), color = "red") +
+  labs(x = "Participant", y = "Entropy (S) over move distributions") +
+  plot_theme +
+  text_theme +
+  theme(axis.text.x = element_blank())
+
 
 
 # 2. Entropy for moves given previous move
@@ -209,11 +236,13 @@ data = data %>%
   group_by(player_id) %>%
   mutate(prev_move = lag(player_move, 1),
          # category of move given previous move, e.g. "rock-paper"
-         move_prev_move = paste(player_move, prev_move, sep = "-"),
-         # marginal probability of each previous move, per round
-         p_rock = cumsum(na.omit(prev_move == "rock")) / round_index,
-         p_paper = cumsum(prev_move == "paper") / round_index,
-         p_scissors = cumsum(prev_move == "scissors") / round_index)
+         move_prev_move = paste(player_move, prev_move, sep = "-")) %>%
+  filter(!is.na(prev_move)) %>%
+  mutate(
+    # marginal probability of each previous move, per round
+    p_rock = cumsum(prev_move == "rock") / round_index,
+    p_paper = cumsum(prev_move == "paper") / round_index,
+    p_scissors = cumsum(prev_move == "scissors") / round_index)
 
 newdat_prev_move = get_weighted_move_counts_prev_move(data)
 prev_move_entropy = get_weighted_move_entropy_prev_move(newdat_prev_move)

@@ -1,0 +1,9 @@
+subjID,is_control,memory_shape,memory_shape_in_expt,memory_shape_catches_fish,input_shape_in_expt
+user_1579031106119,False,"{'top_shape': 'teardrop', 'top_color': 'yellow', 'top_texture': False, 'bottom_shape': 'diamond', 'bottom_color': 'green', 'bottom_texture': False}",0,1,1
+user_1579031106119,False,"{'top_shape': 'triangle', 'top_color': 'yellow', 'top_texture': False, 'bottom_shape': 'circle', 'bottom_color': 'green', 'bottom_texture': True}",1,0,1
+user_1579031106119,False,"{'top_shape': 'oval', 'top_color': 'green', 'top_texture': False, 'bottom_shape': 'diamond', 'bottom_color': 'red', 'bottom_texture': True}",0,1,1
+user_1579031106119,False,"{'top_shape': 'teardrop', 'top_color': 'red', 'top_texture': True, 'bottom_shape': 'triangle', 'bottom_color': 'yellow', 'bottom_texture': False}",1,1,1
+user_1579031106119,False,"{'top_shape': 'diamond', 'top_color': 'blue', 'top_texture': False, 'bottom_shape': 'circle', 'bottom_color': 'blue', 'bottom_texture': False}",1,0,1
+user_1579031106119,False,"{'top_shape': 'star', 'top_color': 'blue', 'top_texture': False, 'bottom_shape': 'circle', 'bottom_color': 'red', 'bottom_texture': False}",1,0,1
+user_1579031106119,False,"{'top_shape': 'circle', 'top_color': 'yellow', 'top_texture': False, 'bottom_shape': 'oval', 'bottom_color': 'yellow', 'bottom_texture': False}",0,0,1
+user_1579031106119,False,"{'top_shape': 'star', 'top_color': 'blue', 'top_texture': False, 'bottom_shape': 'star', 'bottom_color': 'yellow', 'bottom_texture': True}",1,1,1

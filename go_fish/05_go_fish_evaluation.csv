@@ -1,0 +1,7 @@
+subjID,is_control,eval_index,eval_n_start_ts,rule_text,is_target_rule,input_rule_rating,eval_n_end_ts
+user_1579031106119,False,1,1579031197006,"If a lure combination has a red shape or a blue shape, it will catch fish.",False,4,1579031198452
+user_1579031106119,False,2,1579031198452,"If a lure combination has a diamond, it will catch fish.",False,5,1579031200941
+user_1579031106119,False,3,1579031200941,"If a lure combination has a pointy shape on the bottom, it will catch fish.",True,1,1579031203109
+user_1579031106119,False,4,1579031203109,"There is no pattern to which lure combinations catch fish: the results are random, but there are approximately equal numbers that catch fish and don’t.",False,6,1579031205224
+user_1579031106119,False,5,1579031205224,"If a lure combination has a yellow shape or a diamond on the bottom, it will catch fish.",False,5,1579031207403
+user_1579031106119,False,6,1579031207403,"If a lure combination has a purple dot on at least one of the lures, it will catch fish.",False,2,1579031209589
