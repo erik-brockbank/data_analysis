@@ -211,15 +211,20 @@ move_entropy = get_weighted_move_entropy(newdat_moves)
 # TODO "none" moves create NA entropy values for all subsequent rounds. What to do about this?
 
 # Graphs
+# Entropy of each individual over each round
 plot_entropy_individ(move_entropy)
 
-move_entropy %>%
+# Get summary values for each individual
+move_entropy_summary = move_entropy %>%
   group_by(player_id) %>%
   summarize(mean_ent = mean(entropy_moves, na.rm = T),
             vals = n(),
             se = sd(entropy_moves, na.rm = T) / sqrt(vals),
             ci.lower = mean_ent - se,
-            ci.upper = mean_ent + se) %>%
+            ci.upper = mean_ent + se)
+
+# Average entropy of each individual over all rounds compared to overall entropy over moves for that individual
+move_entropy_summary %>%
   ggplot(aes(x = player_id, y = mean_ent)) +
   geom_point() +
   geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper)) +
@@ -229,6 +234,29 @@ move_entropy %>%
   text_theme +
   theme(axis.text.x = element_blank())
 
+move_entropy_high_level = move_entropy_summary %>%
+  summarize(mean_entropy = mean(mean_ent),
+            n = n(),
+            se = sd(mean_ent) / sqrt(n),
+            ci.lower = mean_entropy - se,
+            ci.upper = mean_entropy + se)
+move_entropy_overall_high_level = player.entropy %>%
+  summarize(mean_entropy = mean(entropy.0),
+            n = n(),
+            se = sd(entropy.0) / sqrt(n),
+            ci.lower = mean_entropy - se,
+            ci.upper = mean_entropy + se)
+  
+move_entropy_high_level %>%
+  ggplot(aes(y = mean_entropy, x = 1)) +
+  geom_point(color = "blue") +
+  geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper), color = "blue") +
+  geom_point(data = move_entropy_overall_high_level, aes(y = mean_entropy, x = 1), color = "red") +
+  geom_errorbar(data = move_entropy_overall_high_level, aes(ymin = ci.lower, ymax = ci.upper), color = "red") +
+  labs(x = "", y = "Entropy (S)") +
+  plot_theme +
+  text_theme +
+  theme(axis.text.x = element_blank())
 
 
 # 2. Entropy for moves given previous move
