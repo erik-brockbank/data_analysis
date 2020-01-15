@@ -10,10 +10,8 @@
 
 
 
-rm(list = ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
-
-source('data_processing.R') # script used for data processing/cleanup
+source('00_data_processing.R') # script used for data processing/cleanup
 
 
 

@@ -89,7 +89,6 @@ get_eval_summary = function(eval_data) {
 
 get_time_summary = function(time_data) {
   time_summary = time_data %>%
-    mutate(experiment_completion_time = (expt_end_ts - expt_start_ts) / 1000) %>%
     group_by(is_control) %>%
     summarize(mean_task_time = mean(experiment_completion_time),
               subjects = n(),
@@ -390,13 +389,21 @@ Note also that the target rule statistics above are the mean of all participant 
 
 
 ## Time on Task
+```{r completion_time_ttest, echo=FALSE, message=FALSE}
+time_data = read_data(SUMMARY_DATA)
+time_data = time_data %>%
+  mutate(experiment_completion_time = (expt_end_ts - expt_start_ts) / 1000)
+t = t.test(time_data$experiment_completion_time[time_data$is_control == FALSE],
+       time_data$experiment_completion_time[time_data$is_control == TRUE])
+```
 An important consideration is whether participants simply spent longer on the explanation task than the control description task and therefore performed better. 
 
-Indeed, the figure below suggests that explainers spent longer on the experiment overall. For future versions, we'll isolate the time spent on the explanation/description trials rather than the whole experiment. However, it may be worth putting in place additional checks to limit time on task or exploit behaviors that the control describers may be better at. 
+Indeed, the figure below suggests that explainers spent longer on the experiment overall, though this difference is not significant (*t* = `r round(t$statistic, 2)`, *p* = `r round(t$p.value, 2)`).
+
+For future versions, we'll isolate the time spent on the explanation/description trials rather than the whole experiment. However, it may be worth putting in place additional checks to limit time on task or exploit behaviors that the control describers may be better at. 
 
 
 ```{r completion_time, echo=FALSE, message=FALSE}
-time_data = read_data(SUMMARY_DATA)
 time_summary = get_time_summary(time_data)
 plot_time_data(time_summary)
 ```

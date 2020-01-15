@@ -9,10 +9,8 @@
 #' 
 
 
-rm(list = ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
-
-source('data_processing.R') # script used for data processing/cleanup
+source('00_data_processing.R') # script used for data processing/cleanup
 
 
 PLAYER_SET = unique(data$player_id)
@@ -130,8 +128,8 @@ get.player.3move.dist = function(data) {
            prev.move2 = lag(player_move, 2), # two moves back
            prev.move3 = lag(player_move, 3), # two moves back
            prev.3moves = paste(prev.move, prev.move2, prev.move3, sep = "-")) %>% # category of previous three moves, e.g. "rock-paper-rock"
-    filter(!is.na(prev.move), !is.na(prev.move2), !is.na(prev.move3), # lag calls above set NA for lag on first three moves: ignore it here
-           prev.move != "none", prev.move2 != "none", prev.move3 != "none") %>% # ignore "none" moves for this aggregation
+    filter(!is.na(prev.move) & !is.na(prev.move2) & !is.na(prev.move3) & # lag calls above set NA for lag on first three moves: ignore it here
+           prev.move != "none" & prev.move2 != "none" & prev.move3 != "none") %>% # ignore "none" moves for this aggregation
     count(prev.3moves) %>%
     mutate(total.moves = sum(n),
            p.3prev.moves = n / total.moves)

@@ -1,10 +1,10 @@
 #' 
-#' Analysis script for Go Fish pilot work
+#' Analysis script for Go Fish web version
 #' 
 
 
 rm(list = ls())
-setwd("~/web/vullab/data_analysis/go_fish/pilot")
+setwd("~/web/vullab/data_analysis/go_fish")
 
 library(tidyverse)
 library(viridis)
@@ -14,12 +14,12 @@ library(expss)
 
 # GLOBALS ======================================================================
 
-SUMMARY_DATA = "01_go_fish_pilot_meta.csv"
-TRIAL_DATA = "02_go_fish_pilot_trials.csv"
-GENERATION_RESP_DATA = "03_go_fish_pilot_generation_free_resp.csv"
-GENERATION_JUDG_DATA = "04_go_fish_pilot_generation_judgment.csv"
-EVAL_DATA = "05_go_fish_pilot_evaluation.csv"
-MEMORY_DATA = "06_go_fish_pilot_memory.csv"
+SUMMARY_DATA = "01_go_fish_meta.csv"
+TRIAL_DATA = "02_go_fish_trials.csv"
+GENERATION_RESP_DATA = "03_go_fish_generation_free_resp.csv"
+GENERATION_JUDG_DATA = "04_go_fish_generation_judgment.csv"
+EVAL_DATA = "05_go_fish_evaluation.csv"
+MEMORY_DATA = "06_go_fish_memory.csv"
 
 CONDITION_LABELS = c("TRUE" = "describe", "FALSE" = "explain")
 RULE_EVAL_LABELS = c("TRUE" = "target rule", "FALSE" = "all other rules")
@@ -291,7 +291,7 @@ plot_eval_results(eval_summary)
 # COVARIATE ANALYSES ===========================================================
 
 # Sanity check: experiment time
-# TODO replace this with trial completion time rather than whole experiment
+# TODO supplement this with trial completion time rather than whole experiment
 time_data = read_data(SUMMARY_DATA)
 time_data = time_data %>%
   mutate(experiment_completion_time = (expt_end_ts - expt_start_ts) / 1000)
@@ -317,23 +317,7 @@ generation_data = generation_data %>%
 
 # Score generation data: only correct if it's very clear cut
 generation_data$free_response
-generation_data$free_response_coded[1] = 1
-generation_data$free_response_coded[2] = 1
-generation_data$free_response_coded[3] = 0 # tough call here: had low accuracy on judgment task
-generation_data$free_response_coded[4] = 0
-generation_data$free_response_coded[5] = 1
-generation_data$free_response_coded[6] = 1 # shape disjunction not pointyness
-generation_data$free_response_coded[7] = 0 # tough call here: had fairly low accuracy on judgment task
-generation_data$free_response_coded[8] = 0
-generation_data$free_response_coded[9] = 0 # may have figured out rule but didn't supply it here
-generation_data$free_response_coded[10] = 1 # interesting new response (more than one sideo on bottom)
-generation_data$free_response_coded[11] = 1
-generation_data$free_response_coded[12] = 0
-generation_data$free_response_coded[13] = 1 # disjunction of larger round and smaller pointy or two pointy
-generation_data$free_response_coded[14] = 0
-generation_data$free_response_coded[15] = 0
-generation_data$free_response_coded[16] = 0
-generation_data$free_response_coded[17] = 0
+generation_data$free_response_coded[1] = 0 # TODO fill this and subsequent rows in with 0/1
 
 
 plot_generation_data(generation_data)

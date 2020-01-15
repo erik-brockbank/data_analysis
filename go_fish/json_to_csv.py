@@ -56,20 +56,26 @@ for f in files:
         trial_data = parsed_content["trials"]["trial_data"]
         generation_data_free_resp = parsed_content["trials"]["generation_data"]["input_free_response"]
         generation_data_judgments = parsed_content["trials"]["generation_data"]["judgment_task"]
-        eval_data = parsed_content["trials"]["evaluation_data"]
-        memory_data = parsed_content["trials"]["memory_data"]
+        eval_data = parsed_content["trials"]["evaluation_data"]["eval_ratings"]
+        memory_data = parsed_content["trials"]["memory_data"]["memory_responses"]
 
         if write_index == 0:
             # Write summary data
             header_summary = ["expt_version", "subjID", "is_test", "is_control",
-                "instruction_completion_time", "expt_start_ts", "expt_end_ts"]
+                "instruction_start_ts", "instruction_end_ts",
+                "expt_start_ts", "expt_end_ts",
+                "generation_start_ts", "generation_end_ts",
+                "judgment_start_ts", "judgment_end_ts",
+                "evaluation_start_ts", "evaluation_end_ts",
+                "memory_start_ts", "memory_end_ts"]
             csvwriter_summary.writerow(header_summary)
 
             header_trials = ["subjID", "is_control"] # init header array
             header_trials.extend(trial_data[0].keys())
             csvwriter_trials.writerow(header_trials)
 
-            header_generation = ["subjID", "is_control", "free_response"]
+            header_generation = ["subjID", "is_control", "free_response",
+                                    "generation_start_ts", "generation_end_ts"]
             csvwriter_generation.writerow(header_generation)
 
             header_judgment = ["subjID", "is_control"] # init header array
@@ -77,6 +83,7 @@ for f in files:
             csvwriter_judgment.writerow(header_judgment)
 
             header_eval = ["subjID", "is_control"] # init header array
+            # print(eval_data)
             header_eval.extend(eval_data[0].keys())
             csvwriter_evaluation.writerow(header_eval)
 
@@ -92,7 +99,10 @@ for f in files:
             csvwriter_trials.writerow(vals)
 
         # Write generation task free response data
-        csvwriter_generation.writerow([subjID, is_control, generation_data_free_resp])
+        generation_start_ts = parsed_content["trials"]["generation_data"]["generation_start_ts"]
+        generation_end_ts = parsed_content["trials"]["generation_data"]["generation_end_ts"]
+        csvwriter_generation.writerow([subjID, is_control, generation_data_free_resp,
+                                        generation_start_ts, generation_end_ts])
 
         # Write generation task judgment data
         for s in generation_data_judgments:
@@ -117,9 +127,19 @@ for f in files:
                 subjID,
                 parsed_content["trials"]["is_test"],
                 parsed_content["trials"]["is_control"],
-                parsed_content["trials"]["instruction_data"]["instruction_completion_time"],
+                parsed_content["trials"]["instruction_data"]["instruction_start_ts"],
+                parsed_content["trials"]["instruction_data"]["instruction_end_ts"],
                 parsed_content["trials"]["expt_start_ts"],
-                parsed_content["trials"]["expt_end_ts"]]
+                parsed_content["trials"]["expt_end_ts"],
+                parsed_content["trials"]["generation_data"]["generation_start_ts"],
+                parsed_content["trials"]["generation_data"]["generation_end_ts"],
+                parsed_content["trials"]["generation_data"]["judgment_start_ts"],
+                parsed_content["trials"]["generation_data"]["judgment_end_ts"],
+                parsed_content["trials"]["evaluation_data"]["evaluation_start_ts"],
+                parsed_content["trials"]["evaluation_data"]["evaluation_end_ts"],
+                parsed_content["trials"]["memory_data"]["memory_start_ts"],
+                parsed_content["trials"]["memory_data"]["memory_end_ts"]
+            ]
         csvwriter_summary.writerow(vals)
 
 
