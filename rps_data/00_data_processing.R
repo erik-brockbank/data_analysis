@@ -21,10 +21,10 @@ FREE_RESP_FILE = "rps_data_freeResp.csv" # name of file containing free response
 SLIDER_FILE = "rps_data_sliderData.csv" # name of file containing slider Likert data by participant
 
 # Pilot info
-PILOT_DATA_FILE = "rps_pilot.csv" # name of file containing full dataset for all *pilot* rounds
+# PILOT_DATA_FILE = "rps_pilot.csv" # name of file containing full dataset for all *pilot* rounds
 # Participant IDs who played only 100 rounds (NB: this applies to pilot data only)
-SHORT_ROUND_PLAYERS = c("6ac3a837-c8cc-4bd0-9cd9-40d6dcd6c0c1", "960a15dd-c442-4693-a55d-0096fe8c14b3",
-                        "c45e2174-9181-43a9-a834-c918c4201273", "dd051569-60c1-43c6-8691-f49a47008cd8")
+# SHORT_ROUND_PLAYERS = c("6ac3a837-c8cc-4bd0-9cd9-40d6dcd6c0c1", "960a15dd-c442-4693-a55d-0096fe8c14b3",
+                        # "c45e2174-9181-43a9-a834-c918c4201273", "dd051569-60c1-43c6-8691-f49a47008cd8")
 
 
 #######################
@@ -199,7 +199,7 @@ plot.score.differentials = function(data) {
   
   score_diff %>%
     ggplot(aes(x = point_diff)) +
-    geom_histogram(binwidth = 50, color = "blue", fill = "blue", alpha = 0.5) +
+    geom_histogram(color = "blue", fill = "blue", alpha = 0.5, breaks = c(seq(0, 300, by = 50))) +
     labs(x = "Dyad score differentials") +
     individ_plot_theme
 }
@@ -265,11 +265,16 @@ data = data %>%
 glimpse(data)
 unique(data$game_id)
 
+# figure out which participants didn't write full data
+data %>%
+  group_by(game_id) %>%
+  filter(round_index == 300) %>%
+  mutate(completion = anytime(round_begin_ts))
+
 ### Response times ###
 # Response time when choosing moves
-plot.rt(data) # 100 trial participants look a lot like 300 trial participants
+plot.rt(data)
 # Response time when proceeding to next round after viewing results
-# NB: this won't work for pilot data
 plot.outcome.viewtime(data)
 
 sort(data$player_rt)[1:50] # we have some very low RTs: should we exclude all < 800ms?
@@ -311,14 +316,27 @@ slider_data = slider_data %>%
   filter(!(player_id %in% INCOMPLETE_DATA$player_id))
 glimpse(slider_data)
 
+unique(slider_data$player_id)
+unique(fr_data$player_id)
+
 ### Free response answers ###
 fr_data$free_resp_answer # any notable responses here?
 
 
 ### Likert slider data ###
+slider_summary = slider_data %>%
+  group_by(statement) %>%
+  summarize(mean_resp = mean(resp),
+            n = n(),
+            se = sd(resp) / sqrt(n),
+            ci.lower = mean_resp - se,
+            ci.upper = mean_resp + se)
+
 slider_data %>%
   ggplot(aes(x = statement, y = resp, color = str_wrap(statement, width = 45))) +
   geom_jitter(width = 0.25, alpha = 0.75) +
+  geom_point(data = slider_summary, aes(x = statement, y = mean_resp, color = str_wrap(statement, width = 45)), size = 5) +
+  geom_errorbar(data = slider_summary, aes(x = statement, y = mean_resp, ymin = ci.lower, ymax = ci.upper, color = str_wrap(statement, width = 45))) +
   labs(x = "Slider statement", y = "Response (1-7; Strongly Disagree-Strongly Agree)") +
   individ_plot_theme +
   theme(axis.title.x = element_blank(),
