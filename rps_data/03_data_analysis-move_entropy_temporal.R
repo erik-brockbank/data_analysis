@@ -30,7 +30,8 @@ plot_theme = theme(
   panel.grid = element_line(color = "gray"),
   axis.line = element_line(color = "black"),
   # positioning
-  legend.position = "bottom"
+  legend.position = "bottom",
+  legend.key = element_rect(fill = NA)
 )
 
 text_theme = theme(
@@ -40,10 +41,10 @@ text_theme = theme(
   axis.title.x = element_text(face = "bold", size = 20),
   legend.title = element_text(face = "bold", size = 16),
   # axis text
-  axis.text.y = element_text(size = 12),
+  axis.text.y = element_text(size = 16, face = "bold"),
   axis.text.x = element_text(size = 12, angle = 45, vjust = 0.5),
   # legend text
-  legend.text = element_text(size = 14),
+  legend.text = element_text(size = 20),
   # facet text
   strip.text = element_text(size = 12)
 )
@@ -245,18 +246,26 @@ move_entropy_overall_high_level = player.entropy %>%
             n = n(),
             se = sd(entropy.0) / sqrt(n),
             ci.lower = mean_entropy - se,
-            ci.upper = mean_entropy + se)
+            ci.upper = mean_entropy + se) %>%
+  mutate(category = "overall")
   
 move_entropy_high_level %>%
-  ggplot(aes(y = mean_entropy, x = 1)) +
-  geom_point(color = "blue") +
-  geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper), color = "blue") +
-  geom_point(data = move_entropy_overall_high_level, aes(y = mean_entropy, x = 1), color = "red") +
-  geom_errorbar(data = move_entropy_overall_high_level, aes(ymin = ci.lower, ymax = ci.upper), color = "red") +
-  labs(x = "", y = "Entropy (S)") +
+  mutate(category = "temporal") %>%
+  ggplot(aes(y = mean_entropy, x = "", color = category)) +
+  geom_point(size = 5) +
+  geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper, color = category), width = 0.1) +
+  geom_point(data = move_entropy_overall_high_level, aes(y = mean_entropy, x = "", color = category), size = 5) +
+  geom_errorbar(data = move_entropy_overall_high_level, aes(ymin = ci.lower, ymax = ci.upper), width = 0.1) +
+  scale_color_viridis(discrete = TRUE,
+                      name = element_blank(),
+                      labels = c("temporal" = "Average of temporal entropy", "overall" = "Overall entropy")) +
+  labs(x = "", y = "Shannon Entropy (S)") +
+  ggtitle("Average entropy over time: Distribution of moves") +
   plot_theme +
   text_theme +
   theme(axis.text.x = element_blank())
+
+
 
 
 # 2. Entropy for moves given previous move

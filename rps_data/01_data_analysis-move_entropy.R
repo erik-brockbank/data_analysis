@@ -30,7 +30,9 @@ get.player.move.dist = function(data) {
     group_by(player_id) %>%
     count(player_move) %>%
     mutate(total = sum(n),
-           pmove = n / total)
+           pmove = n / total) %>%
+    # order by "rock", "paper", "scissors"
+    arrange(player_id, factor(player_move, levels = MOVE_SET))
 }
 
 
@@ -162,7 +164,8 @@ get.player.prev.move.cond.probs = function(data) {
 #' conditioned on their *own* previous *two* moves.
 get.player.prev.2move.cond.probs = function(data) {
   prev.2move.df = data.frame(player_id = character(), player_move = character(), prev.move = character(), prev.move2 = character(),
-                             n = numeric(), row.totals = numeric())
+                             n = numeric(), row.totals = numeric(),
+                             stringsAsFactors = F)
   # TODO can we do this without a nested loop....
   # Bayesian smoothing, put count of 1 in each combination before adding true counts
   for (player.move in MOVE_SET) {
@@ -172,7 +175,8 @@ get.player.prev.2move.cond.probs = function(data) {
                                                         player_move = player.move,
                                                         prev.move = prev.move,
                                                         prev.move2 = prev.move2,
-                                                        n = 1, row.totals = length(MOVE_SET)))
+                                                        n = 1, row.totals = length(MOVE_SET),
+                                                        stringsAsFactors = F))
         
       }
     }
@@ -198,7 +202,8 @@ get.player.prev.2move.cond.probs = function(data) {
            row.totals.agg = ifelse(is.na(row.totals.y), row.totals.x, row.totals.x + row.totals.y),
            pmove_2prev.move = n.agg / row.totals.agg) %>%
     select(player_id, player_move, prev.move, prev.move2, 
-           n.agg, row.totals.agg, pmove_2prev.move)
+           n.agg, row.totals.agg, pmove_2prev.move) %>%
+    arrange(player_id, player_move, prev.move, prev.move2)
 }
 
 
@@ -231,7 +236,8 @@ get.opponent.prev.move.cond.probs = function(data) {
 #' conditioned on their *opponent's* previous *two* moves
 get.opponent.prev.2move.cond.probs = function(data) {
   prev.2move.df = data.frame(player_id = character(), player_move = character(), opponent.prev.move = character(), opponent.prev.move2 = character(),
-                            n = numeric(), row.totals = numeric())
+                            n = numeric(), row.totals = numeric(),
+                            stringsAsFactors = F)
   # TODO can we do this without a nested loop....
   # Bayesian smoothing, put count of 1 in each combination before adding true counts
   for (player.move in MOVE_SET) {
@@ -241,7 +247,8 @@ get.opponent.prev.2move.cond.probs = function(data) {
                                                       player_move = player.move,
                                                       opponent.prev.move = prev.move,
                                                       opponent.prev.move2 = prev.move2,
-                                                      n = 1, row.totals = length(MOVE_SET)))
+                                                      n = 1, row.totals = length(MOVE_SET),
+                                                      stringsAsFactors = F))
         
       }
     }
@@ -274,7 +281,8 @@ get.opponent.prev.2move.cond.probs = function(data) {
            row.totals.agg = ifelse(is.na(row.totals.y), row.totals.x, row.totals.x + row.totals.y),
            pmove_opponent.2prev.move = n.agg / row.totals.agg) %>%
     select(player_id, player_move, opponent.prev.move, opponent.prev.move2, 
-           n.agg, row.totals.agg, pmove_opponent.2prev.move)
+           n.agg, row.totals.agg, pmove_opponent.2prev.move) %>%
+    arrange(player_id, player_move, opponent.prev.move, opponent.prev.move2)
 }
 
 
@@ -282,7 +290,8 @@ get.opponent.prev.2move.cond.probs = function(data) {
 #' conditioned on the combination of their previous move *and* their opponent's previous move
 get.player.opponent.prev.move.cond.probs = function(data) {
   prev.2move.df = data.frame(player_id = character(), player_move = character(), opponent.prev.move = character(), opponent.prev.move2 = character(),
-                             n = numeric(), row.totals = numeric())
+                             n = numeric(), row.totals = numeric(),
+                             stringsAsFactors = F)
   # TODO can we do this without a nested loop....
   # Bayesian smoothing, put count of 1 in each combination before adding true counts
   for (player.move in MOVE_SET) {
@@ -292,7 +301,8 @@ get.player.opponent.prev.move.cond.probs = function(data) {
                                                         player_move = player.move,
                                                         prev.move = prev.move,
                                                         opponent.prev.move = prev.move2,
-                                                        n = 1, row.totals = length(MOVE_SET)))
+                                                        n = 1, row.totals = length(MOVE_SET),
+                                                        stringsAsFactors = F))
         
       }
     }
@@ -324,7 +334,8 @@ get.player.opponent.prev.move.cond.probs = function(data) {
            row.totals.agg = ifelse(is.na(row.totals.y), row.totals.x, row.totals.x + row.totals.y),
            pmove_prev.move_opponent.prev.move = n.agg / row.totals.agg) %>%
     select(player_id, player_move, prev.move, opponent.prev.move, 
-           n.agg, row.totals.agg, pmove_prev.move_opponent.prev.move)
+           n.agg, row.totals.agg, pmove_prev.move_opponent.prev.move) %>%
+    arrange(player_id, player_move, prev.move, opponent.prev.move)
 }
 
 #' Function to summarize probability of each move for each participant,
@@ -332,7 +343,8 @@ get.player.opponent.prev.move.cond.probs = function(data) {
 get.player.prev.3move.cond.probs = function(data) {
   prev.3move.df = data.frame(player_id = character(), player_move = character(), 
                              prev.move = character(), prev.move2 = character(), prev.move3 = character(),
-                             n = numeric(), row.totals = numeric())
+                             n = numeric(), row.totals = numeric(),
+                             stringsAsFactors = F)
   # TODO can we do this without a nested loop....
   # Bayesian smoothing, put count of 1 in each combination before adding true counts
   for (player.move in MOVE_SET) {
@@ -344,7 +356,8 @@ get.player.prev.3move.cond.probs = function(data) {
                                                           prev.move = prev.move,
                                                           prev.move2 = prev.move2,
                                                           prev.move3 = prev.move3,
-                                                          n = 1, row.totals = length(MOVE_SET)))
+                                                          n = 1, row.totals = length(MOVE_SET),
+                                                          stringsAsFactors = F))
         }
       }
     }
@@ -372,7 +385,8 @@ get.player.prev.3move.cond.probs = function(data) {
            row.totals.agg = ifelse(is.na(row.totals.y), row.totals.x, row.totals.x + row.totals.y),
            pmove_3prev.move = n.agg / row.totals.agg) %>%
     select(player_id, player_move, prev.move, prev.move2, prev.move3, 
-           n.agg, row.totals.agg, pmove_3prev.move)
+           n.agg, row.totals.agg, pmove_3prev.move) %>%
+    arrange(player_id, player_move, prev.move, prev.move2, prev.move3)
 }
 
 
@@ -587,6 +601,11 @@ ENTROPY_SUMMARY %>%
   individ_plot_theme +
   theme(plot.title = element_text(face = "bold", size = 20)) +
   theme(axis.text.x = element_blank())
+
+
+ENTROPY_SUMMARY %>%
+  group_by(entropy.type) %>%
+  summarize(entropy_sd = sd(entropy.val))
 
 
 #############

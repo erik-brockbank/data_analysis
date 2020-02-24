@@ -10,12 +10,12 @@ import csv
 from os import listdir
 from os.path import isfile, join
 
-EXPERIMENT = "rps" # useful identifier for experiment data: modify this to reflect the particular experiment
-DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/" # path to data files: modify as needed for particular experiments
-OUTPUT_FILE = "{}_data_sliderData.csv".format(EXPERIMENT) # name of csv file to write to
+EXPERIMENT = "rps_v1" # useful identifier for experiment data: modify this to reflect the particular experiment
+DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/v1/" # path to data files: modify as needed for particular experiments
 
 
-with io.open(OUTPUT_FILE, "w") as csv_output:
+output_file = "{}_data_sliderData.csv".format(EXPERIMENT) # name of csv file to write to
+with io.open(output_file, "w") as csv_output:
     csvwriter = csv.writer(csv_output)
     write_index = 0
     files = [f for f in listdir(DATA_PATH) if f.endswith(".json") and "sliderData" in f]

@@ -25,7 +25,8 @@ source('01_data_analysis-move_entropy.R') # script used for calculating entropy 
 
 
 PLAYER_SET = unique(data$player_id)
-OUTCOME_SET = unique(data$player_outcome)
+OUTCOME_SET = data %>% filter(!is.na(player_outcome)) %>% distinct(player_outcome)
+OUTCOME_SET = OUTCOME_SET$player_outcome
 TRANSITION_SET = c("+", "-", "0")
 
 
@@ -506,7 +507,8 @@ get.player.transition.opponent.prev.2transition.cond = function(data) {
 #' given the combination of *their previous transition and their previous outcome*
 get.player.transition.prev.transition.prev.outcome.cond = function(data) {
   player.transition.prev.transition.prev.outcome.df = data.frame(player_id = character(), player.transition = character(), player.prev.transition = character(), prev.outcome = character(),
-                                                                 n = numeric(), row.totals = numeric())
+                                                                 n = numeric(), row.totals = numeric(),
+                                                                 stringsAsFactors = F)
   # TODO can we do this without a nested loop....
   # Bayesian smoothing, put count of 1 in each combination before adding true counts
   for (player.trans in TRANSITION_SET) {
@@ -517,7 +519,8 @@ get.player.transition.prev.transition.prev.outcome.cond = function(data) {
                                                                              player.transition = player.trans,
                                                                              player.prev.transition = prev.trans,
                                                                              prev.outcome = prev.outcome,
-                                                                             n = 1, row.totals = length(TRANSITION_SET)))
+                                                                             n = 1, row.totals = length(TRANSITION_SET),
+                                                                             stringsAsFactors = F))
         
       }
     }
@@ -561,7 +564,8 @@ get.player.transition.prev.transition.prev.outcome.cond = function(data) {
            row.totals.agg = ifelse(is.na(row.totals.y), row.totals.x, row.totals.x + row.totals.y),
            p.transition.prev.transition.prev.outcome = n.agg / row.totals.agg) %>%
     select(player_id, player.transition, player.prev.transition, prev.outcome, 
-           n.agg, row.totals.agg, p.transition.prev.transition.prev.outcome)
+           n.agg, row.totals.agg, p.transition.prev.transition.prev.outcome) %>%
+    arrange(player_id, player.transition, player.prev.transition, prev.outcome)
 }
 
 
@@ -888,6 +892,10 @@ ENTROPY_SUMMARY %>%
   theme(axis.text.x = element_blank())
 
 
+# Look at variance of entropy vals for possible correlation with e.g. win count differentials
+ENTROPY_SUMMARY %>%
+  group_by(entropy.type) %>%
+  summarize(entropy_sd = sd(entropy.val))
 
 
 ### Graph for data blitz and other display purposes (keeps only relevant analyses from those above)
@@ -896,11 +904,13 @@ ENTROPY_SUMMARY_FINAL = player.entropy %>%
   # move distributions
   left_join(player.prev.move.entropy, by = "player_id") %>%
   left_join(opponent.prev.move.entropy, by = "player_id") %>%
+  left_join(player.opponent.prev.move.entropy, by = "player_id") %>%
   left_join(player.prev.2move.entropy, by = "player_id") %>%
   # transition distributions
   left_join(player.transition.entropy, by = "player_id") %>%
   left_join(player.transition.outcome.entropy, by = "player_id") %>%
-  gather(entropy.type, entropy.val, entropy.0:transition.entropy.1.player.outcome)
+  left_join(player.transition.prev.transition.prev.outcome.entropy, by = "player_id") %>%
+  gather(entropy.type, entropy.val, entropy.0:transition.entropy.2.player.prev.transition.prev.outcome)
 
 
 legend.width = 45
@@ -908,8 +918,11 @@ graph.labels.final = c("entropy.0" = str_wrap("Overall distribution of moves ('r
                        "entropy.1.player" = str_wrap("Distribution of moves given player's previous move", legend.width),
                        "entropy.1.opponent" = str_wrap("Distribution of moves given opponent's previous move", legend.width),
                        "entropy.2.player" = str_wrap("Distribution of moves given player's previous two moves", legend.width),
+                       "entropy.2.player.opponent" = str_wrap("Distribution of moves given player's previous move, opponent's previous move", legend.width),
                        "transition.entropy.0" = str_wrap("Distribution of transitions ('+', '-', '0')", legend.width),
-                       "transition.entropy.1.player.outcome" = str_wrap("Distribution of transitions given player's previous outcome ('win', 'tie', 'loss')", legend.width))
+                       "transition.entropy.1.player.outcome" = str_wrap("Distribution of transitions given player's previous outcome ('win', 'tie', 'loss')", legend.width),
+                       "transition.entropy.2.player.prev.transition.prev.outcome" = str_wrap("Distribution of transitions given player's previous transition and previous outcome", legend.width)
+                       )
 
 xlab.final = ""
 ylab.final = "Shannon Entropy (S)"
