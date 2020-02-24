@@ -1,5 +1,5 @@
 #' 
-#' Analysis script for Go Fish web version
+#' Analysis scratchpad for Go Fish web version
 #' 
 
 
@@ -262,6 +262,7 @@ summary_data = read_data(SUMMARY_DATA)
 summary_data = summary_data %>%
   mutate(Condition = ifelse(is_control == TRUE, "Describe", "Explain"))
 tab = table(summary_data$Condition)
+tab
 
 summary_data$browser = "chrome"
 # 9am segments
@@ -291,6 +292,25 @@ plot_prediction_summary(prediction_summary)
 
 # Analysis: generation judgment task accuracy by condition
 generation_judg = read_data(GENERATION_JUDG_DATA)
+
+
+# Add in pilot data?
+pilot_gen_judg = read_data("pilot/04_go_fish_pilot_generation_judgment.csv")
+
+new_full = rbind(generation_judg, pilot_gen_judg)
+new_full = new_full %>%
+  mutate(input_correct = 
+           (input_judgment == judgment_catches_fish)) %>%
+  # NB: we only need subjID here but including it makes later group_by easier
+  group_by(is_control, subjID) %>%
+  summarize(subj_accuracy = sum(input_correct) / n())
+  
+new_full_summary = get_generation_judg_summary(new_full)
+plot_generation_judgments(new_full_summary)
+t.test(new_full$subj_accuracy[new_full$is_control == FALSE],
+       new_full$subj_accuracy[new_full$is_control == TRUE])
+
+
 generation_judg_subj = generation_judg %>%
   mutate(input_correct = 
            (input_judgment == judgment_catches_fish)) %>%

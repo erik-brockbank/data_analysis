@@ -1,7 +1,7 @@
 """
 To run this:
 - cd /Users/erikbrockbank/web/vullab/data_analysis/rps_data
-- python json_to_csv.py
+- python json_to_csv_v2.py
 """
 
 import io
@@ -10,12 +10,12 @@ import csv
 from os import listdir
 from os.path import isfile, join
 
-EXPERIMENT = "rps" # useful identifier for experiment data: modify this to reflect the particular experiment
-DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/" # path to data files: modify as needed for particular experiments
-OUTPUT_FILE = "{}_data.csv".format(EXPERIMENT) # name of csv file to write to
+EXPERIMENT = "rps_v2" # useful identifier for experiment data: modify this to reflect the particular experiment
+DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/v2_test/" # path to data files: modify as needed for particular experiments
 INDIVID_PATH = "individual_files/" # pathway for writing individual game files
 
-with io.open(OUTPUT_FILE, "w") as csv_output:
+output_file = "{}_data.csv".format(EXPERIMENT) # name of csv file to write to
+with io.open(output_file, "w") as csv_output:
     csvwriter = csv.writer(csv_output)
     write_index = 0
     files = [f for f in listdir(DATA_PATH) if f.endswith(".json")
@@ -31,24 +31,38 @@ with io.open(OUTPUT_FILE, "w") as csv_output:
 
             if write_index == 0:
                 # init header array
-                header = ["game_id", "round_index", "player_id", "round_begin_ts",
-                    "player_move", "player_rt", "player_outcome", "player_outcome_viewtime", # note this val won't work with pilot data
-                    "player_points", "player_total"]
+                header = [
+                    # generic data true for all rounds
+                    "game_id", "version", "is_sona_autocredit", "sona_experiment_id", "sona_credit_token", "sona_survey_code",
+                    # data specific to each round (or varies between players)
+                    "round_index", "player_id",
+                    "bot_id", "bot_strategy", "bot_move_probabilities", # NB: bot values only apply for bot rows
+                    "round_begin_ts", "player_move", "player_rt", "player_outcome", "player_outcome_viewtime", # note this val won't work with pilot data
+                    "player_points", "player_total"
+                ]
                 csvwriter.writerow(header)
                 write_index = 1
 
             for r in round_data:
-                p1_vals = [r["game_id"], r["round_index"], r["player1_id"], r["round_begin_ts"],
+                p1_vals = [r["game_id"],
+                    parsed_data["version"], parsed_data["sona"], parsed_data["experiment_id"], parsed_data["credit_token"], parsed_data["survey_code"],
+                    r["round_index"], r["player1_id"],
+                    "", "", "", # bot values ignored for player 1
+                    r["round_begin_ts"],
                     r["player1_move"], r["player1_rt"], r["player1_outcome"], r["player1_outcome_viewtime"], # note this val won't work with pilot data
                     r["player1_points"], r["player1_total"]]
-                p2_vals = [r["game_id"], r["round_index"], r["player2_id"], r["round_begin_ts"],
+                p2_vals = [r["game_id"],
+                    parsed_data["version"], parsed_data["sona"], parsed_data["experiment_id"], parsed_data["credit_token"], parsed_data["survey_code"],
+                    r["round_index"], r["player2_id"],
+                    parsed_data["player2_botid"], parsed_data["player2_bot_strategy"], parsed_data["player2_bot_move_probabilities"], # bot values for player 2
+                    r["round_begin_ts"],
                     r["player2_move"], r["player2_rt"], r["player2_outcome"], r["player2_outcome_viewtime"], # note this val won't work with pilot data
                     r["player2_points"], r["player2_total"]]
                 csvwriter.writerow(p1_vals)
                 csvwriter.writerow(p2_vals)
 
         # write results of this game to individual game csv (for use with RPS_Data visualization tool)
-        output_individ = f.split(".")[0] + ".csv"
+        output_individ = "v2_" + f.split(".")[0] + ".csv"
         with io.open(join(INDIVID_PATH + output_individ), "w") as csv_output_individ:
             csvwriter_individ = csv.writer(csv_output_individ)
             header = [] # init header array

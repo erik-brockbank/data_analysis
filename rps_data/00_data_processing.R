@@ -47,6 +47,45 @@ get.entropy = function(proportions) {
 }
 
 
+get_emp_score_differential = function(data) {
+  score_diff = data %>%
+    group_by(game_id) %>%
+    filter(round_index == max(round_index)) %>%
+    mutate(final_score = player_total + player_points,
+           point_diff = abs(final_score - lag(final_score, 1))) %>%
+    filter(!is.na(point_diff)) %>%
+    select(game_id, point_diff)
+  return(score_diff)
+}
+
+
+get_emp_win_differential = function(data) {
+  win_diff = data %>%
+    group_by(game_id, player_id) %>%
+    count(win_count = player_outcome == "win") %>%
+    filter(win_count == TRUE) %>%
+    group_by(game_id) %>%
+    mutate(opp_win_count = lag(n, 1)) %>%
+    filter(!is.na(opp_win_count)) %>%
+    summarize(win_diff = abs(n - opp_win_count))
+  return(win_diff)
+}
+
+# Generate sample distribution for expected point differential
+get_sample_score_differential = function(reps) {
+  # Participant score differences go up by +/- 4 (+3 and -1) or 0 for win/loss or tie 
+  score_diff_sample = data.frame(point_diff = replicate(reps, abs(sum(sample(c(-4, 0, 4), 300, replace = T)))))
+  return(score_diff_sample)
+}
+
+get_sample_win_count_differential = function(reps) {
+  win_diff_sample = data.frame(
+    win_diff = replicate(reps, abs(sum(sample(c(-1, 0, 1), 300, replace = T))))
+  )
+  return(win_diff_sample)
+}
+
+
 ######################
 ### GRAPHING STYLE ###
 ######################
@@ -79,10 +118,10 @@ individ_plot_theme = theme(
   axis.title.x = element_text(face = "bold", size = 20),
   legend.title = element_text(face = "bold", size = 16),
   # axis text
-  axis.text.y = element_text(size = 12),
-  axis.text.x = element_text(size = 12, angle = 45, vjust = 0.5),
+  axis.text.y = element_text(size = 14, face = "bold"),
+  axis.text.x = element_text(size = 14, angle = 45, vjust = 0.5, face = "bold"),
   # legend text
-  legend.text = element_text(size = 14),
+  legend.text = element_text(size = 16, face = "bold"),
   # facet text
   strip.text = element_text(size = 12),
   # backgrounds, lines
@@ -92,7 +131,8 @@ individ_plot_theme = theme(
   panel.grid = element_line(color = "gray"),
   axis.line = element_line(color = "black"),
   # positioning
-  legend.position = "bottom"
+  legend.position = "bottom",
+  legend.key = element_rect(colour = "transparent", fill = "transparent")
 )
 
 
@@ -187,21 +227,39 @@ plot.outcomes = function(data) {
     facet_wrap(~game_id_abbrev, ncol = 5)
 }
 
-# Check final score differentials for each dyad to see if anybody did so horribly that the data is suspect
-plot.score.differentials = function(data) {
-  score_diff = data %>%
-    group_by(game_id) %>%
-    filter(round_index == max(round_index)) %>%
-    mutate(final_score = player_total + player_points,
-           point_diff = abs(final_score - lag(final_score, 1))) %>%
-    filter(!is.na(point_diff)) %>%
-    select(game_id, point_diff)
-  
+# Check final score differentials for each dyad
+plot.score.differentials = function(score_diff, title, col) {
   score_diff %>%
     ggplot(aes(x = point_diff)) +
-    geom_histogram(color = "blue", fill = "blue", alpha = 0.5, breaks = c(seq(0, 300, by = 50))) +
-    labs(x = "Dyad score differentials") +
+    geom_histogram(color = col, fill = col, alpha = 0.5, breaks = c(seq(0, 300, by = 50))) +
+    labs(x = "Dyad score differentials", y = "Count") +
+    ggtitle(title) +
     individ_plot_theme
+}
+
+
+# Plot win count differentials for each dyad
+plot.win.differentials = function(win_diff, title, group) {
+  win_diff %>%
+    ggplot(aes(x = win_diff, color = group, fill = group)) +
+    geom_histogram(alpha = 0.5, breaks = c(seq(0, 60, by = 10))) +
+    labs(x = "Dyad win count differential", y = "Count") +
+    # Explicit ylim values used for cog sci graphs to make them pretty
+    #ylim(c(0, 6000)) +
+    #ylim(c(0, 20)) +
+    scale_color_viridis(discrete = T,
+                        name = element_blank(),
+                        #labels = element_blank(),
+                        begin = 0.2,
+                        end = 0.8) +
+    scale_fill_viridis(discrete = T,
+                       name = element_blank(),
+                       #labels = element_blank(),
+                       begin = 0.2, 
+                       end = 0.8) +
+    ggtitle(title) +
+    individ_plot_theme
+    #theme(legend.position = "none")
 }
 
 
@@ -266,14 +324,24 @@ glimpse(data)
 unique(data$game_id)
 
 # figure out which participants didn't write full data
-data %>%
-  group_by(game_id) %>%
-  filter(round_index == 300) %>%
-  mutate(completion = anytime(round_begin_ts))
+# data %>%
+#   group_by(game_id) %>%
+#   filter(round_index == 300) %>%
+#   mutate(completion = anytime(round_begin_ts))
+
 
 ### Response times ###
 # Response time when choosing moves
 plot.rt(data)
+
+rt_summary = data %>%
+  group_by(player_id) %>%
+  summarize(mean_rt = mean(player_rt),
+            nrounds = n())
+
+mean(rt_summary$mean_rt)
+sd(rt_summary$mean_rt)
+  
 # Response time when proceeding to next round after viewing results
 plot.outcome.viewtime(data)
 
@@ -292,7 +360,30 @@ plot.outcomes(data) # No players appear wildly mismatched, though score differen
 
 ### Scores ###
 # Final score differentials for each dyad
-plot.score.differentials(data)
+score_diff_empirical = get_emp_score_differential(data)
+plot.score.differentials(score_diff_empirical, "Empirical Data", "blue")
+# Summary stats
+mean(score_diff_empirical$point_diff)
+sd(score_diff_empirical$point_diff) / sqrt(nrow(score_diff_empirical))
+
+
+score_diff_null = get_sample_score_differential(10000)
+plot.score.differentials(score_diff_null, "Sampled Null Data", "red")
+# Summary stats
+mean(score_diff_null$point_diff)
+
+
+### Win counts ###
+win_diff_empirical = get_emp_win_differential(data)
+plot.win.differentials(win_diff_empirical, "Distribution of win count differentials", "Empirical data")
+# Summary stats
+mean(win_diff_empirical$win_diff)
+sd(win_diff_empirical$win_diff) / sqrt(nrow(win_diff_empirical))
+
+win_diff_null = get_sample_win_count_differential(10000)
+plot.win.differentials(win_diff_null, "Distribution of win count differentials", "Sampled null data")
+# Summary stats
+mean(win_diff_null$win_diff)
 
 
 ### Effort ###
@@ -301,6 +392,15 @@ plot.score.differentials(data)
 plot.move.sequence(data)
 
 
+# Completion time
+completion_summary = data %>%
+  group_by(player_id) %>%
+  summarize(completion_time = round_begin_ts[round_index == 300],
+            start_time =  round_begin_ts[round_index == 1],
+            total_secs = (completion_time - start_time) / 1000)
+
+mean(completion_summary$total_secs)
+sd(completion_summary$total_secs)
 
 ###################
 ### SURVEY DATA ###
