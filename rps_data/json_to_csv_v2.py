@@ -35,7 +35,7 @@ with io.open(output_file, "w") as csv_output:
                     # generic data true for all rounds
                     "game_id", "version", "is_sona_autocredit", "sona_experiment_id", "sona_credit_token", "sona_survey_code",
                     # data specific to each round (or varies between players)
-                    "round_index", "player_id",
+                    "round_index", "player_id", "is_bot",
                     "bot_strategy", "bot_move_probabilities", # NB: bot values only apply for bot rows
                     "round_begin_ts", "player_move", "player_rt", "player_outcome", "player_outcome_viewtime", # note this val won't work with pilot data
                     "player_points", "player_total"
@@ -46,14 +46,14 @@ with io.open(output_file, "w") as csv_output:
             for r in round_data:
                 p1_vals = [r["game_id"],
                     parsed_data["version"], parsed_data["sona"], parsed_data["experiment_id"], parsed_data["credit_token"], parsed_data["survey_code"],
-                    r["round_index"], r["player1_id"],
+                    r["round_index"], r["player1_id"], 0,
                     parsed_data["player2_bot_strategy"], parsed_data["player2_bot_move_probabilities"], # bot values for player 2 included here as well
                     r["round_begin_ts"],
                     r["player1_move"], r["player1_rt"], r["player1_outcome"], r["player1_outcome_viewtime"], # note this val won't work with pilot data
                     r["player1_points"], r["player1_total"]]
                 p2_vals = [r["game_id"],
                     parsed_data["version"], parsed_data["sona"], parsed_data["experiment_id"], parsed_data["credit_token"], parsed_data["survey_code"],
-                    r["round_index"], parsed_data["player2_botid"],
+                    r["round_index"], parsed_data["player2_botid"], 1,
                     parsed_data["player2_bot_strategy"], parsed_data["player2_bot_move_probabilities"], # bot values for player 2
                     r["round_begin_ts"],
                     r["player2_move"], r["player2_rt"], r["player2_outcome"], r["player2_outcome_viewtime"], # note this val won't work with pilot data

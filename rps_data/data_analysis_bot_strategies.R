@@ -32,20 +32,23 @@ read_data = function(filename) {
 }
 
 get_empirical_win_count_differential = function(data) {
+  # NB: this is different from the empirical win count differential in v1 because
+  # we care about human wins - bot wins, not absolute value between each player
   win_diff = data %>%
-    group_by(game_id, player_id) %>%
+    group_by(game_id, player_id, is_bot) %>%
     count(win_count = player_outcome == "win") %>%
     filter(win_count == TRUE) %>%
     group_by(game_id) %>%
-    mutate(opp_win_count = lag(n, 1)) %>%
-    filter(!is.na(opp_win_count)) %>%
-    summarize(win_diff = abs(n - opp_win_count))
+    summarize(win_count_diff = n[is_bot == 0] - n[is_bot == 1]) %>%
+    as.data.frame()
   return(win_diff)
 }
 
 get_null_win_count_differential = function(reps) {
+  # NB: this differs slightly from the empirical null from v1 because
+  # we care about humans *beating* bots, not absolute value between both opponents
   win_diff_null = data.frame(
-    win_diff = replicate(reps, abs(sum(sample(c(-1, 0, 1), 300, replace = T))))
+    win_count_diff = replicate(reps, sum(sample(c(-1, 0, 1), 300, replace = T)))
   )
   return(win_diff_null)
 }
@@ -53,11 +56,11 @@ get_null_win_count_differential = function(reps) {
 get_win_count_differential_summary = function(strategy_data, strategy) {
   strategy_data %>%
     summarize(strategy = strategy,
-              mean_win_diff = mean(win_diff),
+              mean_win_count_diff = mean(win_count_diff),
               n = n(),
-              se = sd(win_diff) / sqrt(n),
-              lower_se = mean_win_diff - se,
-              upper_se = mean_win_diff + se)
+              se = sd(win_count_diff) / sqrt(n),
+              lower_se = mean_win_count_diff - se,
+              upper_se = mean_win_count_diff + se)
 }
 
 
@@ -94,8 +97,8 @@ default_plot_theme = theme(
 # Histogram of win count differentials for each dyad in a given strategy group
 plot_win_count_differential = function(win_diff, group) {
   win_diff %>%
-    ggplot(aes(x = win_diff, color = group, fill = group)) +
-    geom_histogram(alpha = 0.5, breaks = c(seq(0, 60, by = 10))) +
+    ggplot(aes(x = win_count_diff, color = group, fill = group)) +
+    geom_histogram(alpha = 0.5, breaks = c(seq(-60, 60, by = 10))) +
     labs(x = "win count differential", y = "count") +
     # Explicit ylim values used to optimize graphs
     # ylim(c(0, 6000)) +
@@ -115,19 +118,19 @@ plot_win_count_differential = function(win_diff, group) {
 
 # Mean + error of win count differentials for each strategy group
 label_width = 10
-summary_labels = c("Sampled null data" = str_wrap("Sampled null data", label_width),
-                   "Previous move (+)" = str_wrap("Previous move (+)", label_width),
+summary_labels = c("Previous move (+)" = str_wrap("Previous move (+)", label_width),
                    "Previous move (-)" = str_wrap("Previous move (-)", label_width),
                    "Opponent previous move (+)" = str_wrap("Opponent previous move (+)", label_width),
                    "Opponent previous move (0)" = str_wrap("Opponent previous move (0)", label_width))
 
 plot_win_count_differential_summary = function(wcd_summary) {
   wcd_summary %>%
-    ggplot(aes(x = strategy, y = mean_win_diff)) +
+    ggplot(aes(x = strategy, y = mean_win_count_diff)) +
     geom_point(aes(color = strategy),
                size = 6) +
     geom_errorbar(aes(color = strategy, ymin = lower_se, ymax = upper_se),
                   width = 0.25, size = 1) +
+    geom_hline(yintercept = 0, size = 2, linetype = "dashed", color = "red") +
     labs(x = "", y = "mean win count differential") +
     ggtitle("Win count differential across bot strategies") +
     scale_x_discrete(labels = summary_labels) +
@@ -197,8 +200,7 @@ hist_prev_move_positive + hist_prev_move_negative +
 
 
 # Mean + SE of win count differential for each strategy
-wcd_summary = bind_rows(get_win_count_differential_summary(wcd_null, "Sampled null data"),
-                        get_win_count_differential_summary(wcd_prev_move_positive, "Previous move (+)"),
+wcd_summary = bind_rows(get_win_count_differential_summary(wcd_prev_move_positive, "Previous move (+)"),
                         get_win_count_differential_summary(wcd_prev_move_negative, "Previous move (-)"),
                         get_win_count_differential_summary(wcd_opponent_prev_move_positive, "Opponent previous move (+)"),
                         get_win_count_differential_summary(wcd_opponent_prev_move_nil, "Opponent previous move (0)")
