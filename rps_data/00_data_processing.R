@@ -16,9 +16,9 @@ library(viridis)
 
 
 
-DATA_FILE = "rps_data.csv" # name of file containing full dataset for all rounds
-FREE_RESP_FILE = "rps_data_freeResp.csv" # name of file containing free response data by participant
-SLIDER_FILE = "rps_data_sliderData.csv" # name of file containing slider Likert data by participant
+DATA_FILE = "rps_v1_data.csv" # name of file containing full dataset for all rounds
+FREE_RESP_FILE = "rps_v1_data_freeResp.csv" # name of file containing free response data by participant
+SLIDER_FILE = "rps_v1_data_sliderData.csv" # name of file containing slider Likert data by participant
 
 # Pilot info
 # PILOT_DATA_FILE = "rps_pilot.csv" # name of file containing full dataset for all *pilot* rounds
