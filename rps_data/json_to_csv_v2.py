@@ -36,7 +36,7 @@ with io.open(output_file, "w") as csv_output:
                     "game_id", "version", "is_sona_autocredit", "sona_experiment_id", "sona_credit_token", "sona_survey_code",
                     # data specific to each round (or varies between players)
                     "round_index", "player_id",
-                    "bot_id", "bot_strategy", "bot_move_probabilities", # NB: bot values only apply for bot rows
+                    "bot_strategy", "bot_move_probabilities", # NB: bot values only apply for bot rows
                     "round_begin_ts", "player_move", "player_rt", "player_outcome", "player_outcome_viewtime", # note this val won't work with pilot data
                     "player_points", "player_total"
                 ]
@@ -47,14 +47,14 @@ with io.open(output_file, "w") as csv_output:
                 p1_vals = [r["game_id"],
                     parsed_data["version"], parsed_data["sona"], parsed_data["experiment_id"], parsed_data["credit_token"], parsed_data["survey_code"],
                     r["round_index"], r["player1_id"],
-                    "", "", "", # bot values ignored for player 1
+                    parsed_data["player2_bot_strategy"], parsed_data["player2_bot_move_probabilities"], # bot values for player 2 included here as well
                     r["round_begin_ts"],
                     r["player1_move"], r["player1_rt"], r["player1_outcome"], r["player1_outcome_viewtime"], # note this val won't work with pilot data
                     r["player1_points"], r["player1_total"]]
                 p2_vals = [r["game_id"],
                     parsed_data["version"], parsed_data["sona"], parsed_data["experiment_id"], parsed_data["credit_token"], parsed_data["survey_code"],
-                    r["round_index"], r["player2_id"],
-                    parsed_data["player2_botid"], parsed_data["player2_bot_strategy"], parsed_data["player2_bot_move_probabilities"], # bot values for player 2
+                    r["round_index"], parsed_data["player2_botid"],
+                    parsed_data["player2_bot_strategy"], parsed_data["player2_bot_move_probabilities"], # bot values for player 2
                     r["round_begin_ts"],
                     r["player2_move"], r["player2_rt"], r["player2_outcome"], r["player2_outcome_viewtime"], # note this val won't work with pilot data
                     r["player2_points"], r["player2_total"]]
@@ -62,7 +62,7 @@ with io.open(output_file, "w") as csv_output:
                 csvwriter.writerow(p2_vals)
 
         # write results of this game to individual game csv (for use with RPS_Data visualization tool)
-        output_individ = "v2_" + f.split(".")[0] + ".csv"
+        output_individ = f.split(".")[0] + ".csv"
         with io.open(join(INDIVID_PATH + output_individ), "w") as csv_output_individ:
             csvwriter_individ = csv.writer(csv_output_individ)
             header = [] # init header array
