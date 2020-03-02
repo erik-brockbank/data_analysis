@@ -11,7 +11,7 @@ from os import listdir
 from os.path import isfile, join
 
 EXPERIMENT = "rps_v2" # useful identifier for experiment data: modify this to reflect the particular experiment
-DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/v2_test/" # path to data files: modify as needed for particular experiments
+DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/v2/" # path to data files: modify as needed for particular experiments
 INDIVID_PATH = "individual_files/" # pathway for writing individual game files
 
 output_file = "{}_data.csv".format(EXPERIMENT) # name of csv file to write to
@@ -63,16 +63,17 @@ with io.open(output_file, "w") as csv_output:
 
         # write results of this game to individual game csv (for use with RPS_Data visualization tool)
         output_individ = f.split(".")[0] + ".csv"
-        with io.open(join(INDIVID_PATH + output_individ), "w") as csv_output_individ:
-            csvwriter_individ = csv.writer(csv_output_individ)
-            header = [] # init header array
-            header.extend(round_data[0].keys())
-            csvwriter_individ.writerow(header)
-            for r in round_data:
-                vals = [] # init data array
-                vals.extend(r.values())
-                csvwriter_individ.writerow(vals)
-        csv_output_individ.close()
+        if len(round_data) > 0:
+            with io.open(join(INDIVID_PATH + output_individ), "w") as csv_output_individ:
+                csvwriter_individ = csv.writer(csv_output_individ)
+                header = [] # init header array
+                header.extend(round_data[0].keys())
+                csvwriter_individ.writerow(header)
+                for r in round_data:
+                    vals = [] # init data array
+                    vals.extend(r.values())
+                    csvwriter_individ.writerow(vals)
+            csv_output_individ.close()
 
 
 csv_output.close()

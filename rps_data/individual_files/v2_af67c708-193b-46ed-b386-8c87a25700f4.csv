@@ -1,0 +1,6 @@
+game_id,version,round_index,player1_id,player2_id,round_begin_ts,player1_move,player2_move,player1_rt,player2_rt,player1_outcome,player2_outcome,player1_outcome_viewtime,player2_outcome_viewtime,player1_points,player2_points,player1_total,player2_total
+af67c708-193b-46ed-b386-8c87a25700f4,2,1,a39ab12c-5d8c-4561-8664-fce38f4bb7b3,bot,1582607484843,paper,paper,167,0,tie,tie,37928,0,0,0,0,0
+af67c708-193b-46ed-b386-8c87a25700f4,2,2,a39ab12c-5d8c-4561-8664-fce38f4bb7b3,bot,1582607523767,rock,scissors,1187,0,win,loss,3520,0,3,-1,0,0
+af67c708-193b-46ed-b386-8c87a25700f4,2,3,a39ab12c-5d8c-4561-8664-fce38f4bb7b3,bot,1582607530635,paper,rock,2780,0,win,loss,23643,0,3,-1,3,-1
+af67c708-193b-46ed-b386-8c87a25700f4,2,4,a39ab12c-5d8c-4561-8664-fce38f4bb7b3,bot,1582607560869,scissors,scissors,700,0,tie,tie,2014,0,0,0,6,-2
+af67c708-193b-46ed-b386-8c87a25700f4,2,5,a39ab12c-5d8c-4561-8664-fce38f4bb7b3,bot,1582607568661,paper,rock,768,0,win,loss,191364,0,3,-1,6,-2
