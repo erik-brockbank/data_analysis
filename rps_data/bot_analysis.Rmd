@@ -1,24 +1,17 @@
-#' 
-#' RPS bot analysis
-#' Examines human performance against bot opponents with varying strategies
-#' 
+---
+title: "RPS Bot Analysis"
+output: html_document
+---
 
-
-
-setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
-rm(list = ls())
+```{r setup, include=FALSE}
 library(tidyverse)
 library(viridis)
 library(patchwork)
-
-# To copy latest data to this remote machine:
-# 1. on local host: cd /Users/erikbrockbank/web/vullab/data_analysis/rps_data
-# 2. on local host: scp rps_v2_data.csv ebrockba@ssrde.ucsd.edu:/home/AD/ebrockba/rps/
-# 3. Repeat 2 for `rps_v2_data_freeResp.csv` and `rps_v2_data_sliderData.csv`
+library(knitr)
+```
 
 
-# GLOBALS =========================================================================================
-
+```{r globals, include=FALSE}
 DATA_FILE = "rps_v2_data.csv" # name of file containing full dataset for all rounds
 FREE_RESP_FILE = "rps_v2_data_freeResp.csv" # file containing free response data by participant
 SLIDER_FILE = "rps_v2_data_sliderData.csv" # file containing slider Likert data by participant
@@ -35,15 +28,11 @@ STRATEGY_LOOKUP = list("prev_move_positive" = "Previous move (+)",
                        "win_nil_lose_positive" = "Win-stay-lose-positive",
                        "win_positive_lose_negative" = "Win-positive-lose-negative",
                        "outcome_transition_dual_dependency" = "Outcome-transition dual dependency")
-
-# ANALYSIS FUNCTIONS ==============================================================================
-
-read_data = function(filename) {
-  data = read_csv(filename)
-  return(data)
-}
+```
 
 
+```{r analysis_functions, echo=FALSE}
+# Read in and process game results data (includes removal of duplicates, etc.)
 read_game_data = function(filename) {
   data = read_csv(filename)
   data$bot_strategy = factor(data$bot_strategy, levels = STRATEGY_LEVELS)
@@ -55,7 +44,7 @@ read_game_data = function(filename) {
     filter(rounds < NUM_ROUNDS) %>%
     select(game_id) %>%
     unique()
-  
+
   data = data %>%
     filter(!(game_id %in% incomplete_games$game_id))
   
@@ -89,6 +78,7 @@ read_game_data = function(filename) {
   return(data)
 }
 
+# Get win count differential by bot strategy, player
 get_empirical_win_count_differential = function(data) {
   # NB: this is different from the empirical win count differential in v1 because
   # we care about human wins - bot wins, not absolute value between each player
@@ -102,6 +92,7 @@ get_empirical_win_count_differential = function(data) {
   return(win_diff)
 }
 
+# Get win count differential for random behavior
 get_null_win_count_differential = function(reps) {
   # NB: this differs slightly from the empirical null from v1 because
   # we care about humans *beating* bots, not absolute value between both opponents
@@ -111,6 +102,7 @@ get_null_win_count_differential = function(reps) {
   return(win_diff_null)
 }
 
+# Get summary statistics for win count differential by strategy
 get_win_count_differential_summary = function(strategy_data) {
   strategy_data %>%
     group_by(bot_strategy) %>%
@@ -147,7 +139,6 @@ get_block_data_summary = function(subject_block_data) {
               upper_ci = mean_win_pct + se_win_pct)
 }
 
-
 # Get loss percent for each bot dependent on their previous move
 get_bot_prev_move_loss_pct = function(data) {
   data %>%
@@ -182,7 +173,6 @@ get_player_prev_move_win_pct = function(data) {
     summarize(player_win_pct = n[player_outcome == "win"] / sum(n))
 }
 
-
 # Get loss percent for each bot dependent on the bot's previous outcome
 get_bot_prev_outcome_loss_pct = function(data) {
   data %>%
@@ -215,56 +205,6 @@ get_bot_prev2_outcome_loss_pct = function(data) {
     summarize(player_win_pct = n[player_outcome == "loss"] / sum(n))
 }
 
-# Get loss percent for each bot dependent on the transition generated in this round
-get_bot_transition_loss_pct = function(data) {
-  data %>%
-    filter(bot_strategy == "win_nil_lose_positive" | bot_strategy == "win_positive_lose_negative") %>%
-    group_by(player_id) %>%
-    mutate(prev_move = lag(player_move, 1)) %>%
-           #prev_move2 = lag(player_move, 2)) %>%
-    filter(is_bot == 1, # look only at bot prev moves
-           !is.na(prev_move), # lag call above sets NA for lag on first move: ignore it here
-           prev_move != "none", player_move != "none") %>%
-    # NB: this can be slow to execute
-    mutate(transition = case_when(prev_move == player_move ~ "0",
-                                       ((prev_move == "rock" & player_move == "paper") |
-                                          (prev_move == "paper" & player_move == "scissors") |
-                                          (prev_move == "scissors" & player_move == "rock")) ~ "+",
-                                       ((prev_move == "rock" & player_move == "scissors") |
-                                          (prev_move == "paper" & player_move == "rock") |
-                                          (prev_move == "scissors" & player_move == "paper")) ~ "-")) %>%
-    group_by(bot_strategy, game_id, player_id, transition) %>%
-    count(player_outcome) %>%
-    filter(!is.na(player_outcome)) %>% # TODO why do we have NA game outcomes??
-    group_by(bot_strategy, game_id, player_id, transition) %>%
-    summarize(loss_pct = n[player_outcome == "loss"] / sum(n))
-}
-
-# Get loss percent for each bot dependent on the transition generated by the *previous* round
-get_bot_prev_transition_loss_pct = function(data) {
-  data %>%
-    filter(bot_strategy == "win_nil_lose_positive" | bot_strategy == "win_positive_lose_negative") %>%
-    group_by(player_id) %>%
-    mutate(prev_move = lag(player_move, 1),
-           prev_move2 = lag(player_move, 2)) %>%
-    filter(is_bot == 1, # look only at bot prev moves
-           !is.na(prev_move), !is.na(prev_move2), # lag call above sets NA for lag on first two moves: ignore it here
-           prev_move2 != "none", prev_move != "none", player_move != "none") %>%
-    # NB: this can be slow to execute
-    mutate(transition = case_when(prev_move2 == prev_move ~ "0",
-                                  ((prev_move2 == "rock" & prev_move == "paper") |
-                                     (prev_move2 == "paper" & prev_move == "scissors") |
-                                     (prev_move2 == "scissors" & prev_move == "rock")) ~ "+",
-                                  ((prev_move2 == "rock" & prev_move == "scissors") |
-                                     (prev_move2 == "paper" & prev_move == "rock") |
-                                     (prev_move2 == "scissors" & prev_move == "paper")) ~ "-")) %>%
-    group_by(bot_strategy, game_id, player_id, transition) %>%
-    count(player_outcome) %>%
-    filter(!is.na(player_outcome)) %>% # TODO why do we have NA game outcomes??
-    group_by(bot_strategy, game_id, player_id, transition) %>%
-    summarize(loss_pct = n[player_outcome == "loss"] / sum(n))
-}
-
 # Get summary win percent by strategy (dependent on previous move by bot or player)
 get_prev_move_win_pct_summary = function(prev_move_data) {
   prev_move_data %>%
@@ -275,6 +215,7 @@ get_prev_move_win_pct_summary = function(prev_move_data) {
               se_lower = mean_player_win_pct - se,
               se_upper = mean_player_win_pct + se)
 }
+
 
 # Get summary win percent by strategy (dependent on previous outcome by bot or player)
 get_prev_outcome_win_pct_summary = function(bot_loss_prev_outcome) {
@@ -287,24 +228,14 @@ get_prev_outcome_win_pct_summary = function(bot_loss_prev_outcome) {
               se_upper = mean_player_win_pct + se)
 }
 
-
-# Get summary loss percent (win percent for participants) aggregating over all bots, by strategy (dependent on transition)
-get_bot_transition_loss_pct_summary = function(bot_loss_transition) {
-  bot_loss_transition %>%
-    group_by(bot_strategy, transition) %>%
-    summarize(mean_player_win_pct = mean(loss_pct),
-              n = n(),
-              se = sd(loss_pct) / sqrt(n),
-              se_lower = mean_player_win_pct - se,
-              se_upper = mean_player_win_pct + se)
-}
+```
 
 
-# GRAPH STYLE =====================================================================================
 
+```{r graph_style, echo=FALSE}
 default_plot_theme = theme(
   # titles
-  plot.title = element_text(face = "bold", size = 20),
+  plot.title = element_text(face = "bold", size = 18),
   axis.title.y = element_text(face = "bold", size = 16),
   axis.title.x = element_text(face = "bold", size = 16),
   legend.title = element_text(face = "bold", size = 16),
@@ -325,10 +256,11 @@ default_plot_theme = theme(
   legend.position = "bottom",
   legend.key = element_rect(colour = "transparent", fill = "transparent")
 )
+```
 
 
-# GRAPH FUNCTIONS =================================================================================
 
+```{r graphing_functions, echo=FALSE}
 # Histogram of win count differentials for each dyad in a given strategy group
 plot_win_count_differential = function(win_diff, group, min, max, labelx, labely) {
   avg = round(mean(win_diff$win_count_diff), 1)
@@ -375,12 +307,12 @@ plot_null_win_count_differential = function(win_diff, group, min, max) {
 plot_win_count_differential_summary = function(wcd_summary) {
   label_width = 10
   summary_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width),
-                     "prev_move_negative" = str_wrap(STRATEGY_LOOKUP[["prev_move_negative"]], label_width),
-                     "opponent_prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_positive"]], label_width),
-                     "opponent_prev_move_nil" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_nil"]], label_width),
-                     "win_nil_lose_positive" = str_wrap(STRATEGY_LOOKUP[["win_nil_lose_positive"]], label_width),
-                     "win_positive_lose_negative" = str_wrap(STRATEGY_LOOKUP[["win_positive_lose_negative"]], label_width),
-                     "outcome_transition_dual_dependency" = str_wrap(STRATEGY_LOOKUP[["outcome_transition_dual_dependency"]], label_width))
+                   "prev_move_negative" = str_wrap(STRATEGY_LOOKUP[["prev_move_negative"]], label_width),
+                   "opponent_prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_positive"]], label_width),
+                   "opponent_prev_move_nil" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_nil"]], label_width),
+                   "win_nil_lose_positive" = str_wrap(STRATEGY_LOOKUP[["win_nil_lose_positive"]], label_width),
+                   "win_positive_lose_negative" = str_wrap(STRATEGY_LOOKUP[["win_positive_lose_negative"]], label_width),
+                   "outcome_transition_dual_dependency" = str_wrap(STRATEGY_LOOKUP[["outcome_transition_dual_dependency"]], label_width))
   
   wcd_summary %>%
     ggplot(aes(x = bot_strategy, y = mean_win_count_diff)) +
@@ -409,12 +341,12 @@ plot_win_count_differential_summary = function(wcd_summary) {
 plot_win_pct_by_block = function(block_data_summary) {
   label_width = 20
   strategy_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width), 
-                      "prev_move_negative" = str_wrap(STRATEGY_LOOKUP[["prev_move_negative"]], label_width),
-                      "opponent_prev_move_nil" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_nil"]], label_width),
-                      "opponent_prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_positive"]], label_width),
-                      "win_nil_lose_positive" = str_wrap(STRATEGY_LOOKUP[["win_nil_lose_positive"]], label_width),
-                      "win_positive_lose_negative" = str_wrap(STRATEGY_LOOKUP[["win_positive_lose_negative"]], label_width),
-                      "outcome_transition_dual_dependency" = str_wrap(STRATEGY_LOOKUP[["outcome_transition_dual_dependency"]], label_width))
+                    "prev_move_negative" = str_wrap(STRATEGY_LOOKUP[["prev_move_negative"]], label_width),
+                    "opponent_prev_move_nil" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_nil"]], label_width),
+                    "opponent_prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_positive"]], label_width),
+                    "win_nil_lose_positive" = str_wrap(STRATEGY_LOOKUP[["win_nil_lose_positive"]], label_width),
+                    "win_positive_lose_negative" = str_wrap(STRATEGY_LOOKUP[["win_positive_lose_negative"]], label_width),
+                    "outcome_transition_dual_dependency" = str_wrap(STRATEGY_LOOKUP[["outcome_transition_dual_dependency"]], label_width))
   
   block_data_summary %>%
     ggplot(aes(x = round_block, y = mean_win_pct, color = bot_strategy)) +
@@ -446,22 +378,6 @@ plot_prev_move_win_pct = function(bot_loss_summary_prev_move, strategy, xlabel) 
           axis.text.x = element_text(angle = 0, vjust = 1))
 }
 
-# Plot average win percent based on transition dependency
-# NB: this is almost identical to the above
-plot_transition_win_pct = function(bot_loss_summary_transition, strategy, xlabel) {
-  bot_loss_summary_transition %>%
-    filter(bot_strategy == strategy) %>%
-    ggplot(aes(x = transition, y = mean_player_win_pct)) +
-    geom_bar(stat = "identity", alpha = 0.5, color = "grey50", fill = "steelblue") +
-    geom_errorbar(aes(ymin = se_lower, ymax = se_upper), width = 0.5, size = 1, color = "midnightblue") +
-    geom_hline(yintercept = 1 / 3, linetype = "dashed", color = "red", size = 1) +
-    labs(x = xlabel, y = "Avg. player win pct") +
-    ggtitle(STRATEGY_LOOKUP[[strategy]]) +
-    default_plot_theme +
-    theme(legend.position = "none",
-          axis.text.x = element_text(angle = 0, vjust = 1))
-}
-
 # Plot average win percent based on outcome dependency
 plot_outcome_win_pct = function(bot_loss_summary_prev_outcome, strategy, xlabel) {
   bot_loss_summary_prev_outcome %>%
@@ -476,45 +392,84 @@ plot_outcome_win_pct = function(bot_loss_summary_prev_outcome, strategy, xlabel)
     theme(legend.position = "none",
           axis.text.x = element_text(angle = 0, vjust = 1))
 }
+```
 
 
 
-# DATA PROCESSING =================================================================================
-
-
-# Check for participants with missing data
-# data = read_data(DATA_FILE)
-# incomplete_codes = c(24156)
-# data %>%
-#   filter(sona_survey_code %in% incomplete_codes) %>%
-#   group_by(sona_survey_code, game_id) %>%
-#   filter(is_bot == 0) %>%
-#   summarize(rows = n())
-
-# Read in data
+```{r analysis, message=FALSE, echo=FALSE} 
 data = read_game_data(DATA_FILE)
-length(unique(data$game_id))
 
-slider_data = read_data(SLIDER_FILE)
-fr_data = read_data(FREE_RESP_FILE)
+participants = data %>%
+  filter(is_bot == 0) %>%
+  select(player_id) %>%
+  unique() %>%
+  summarize(n = n())
+
+bots = length(unique(data$bot_strategy))
+```
 
 
 
-  
+## Introduction
+
+We investigate people's performance in the rock, paper, scissors game (RPS) against a series of bots employing increasingly complex strategies. 
+
+What patterns do people detect when playing against bots that have a stable dependency structure? Is people's ability to win consistently against a bot predicted by the complexity of the bot's strategy?
+
+We find that people show a reliable ability to exploit simple patterns based on their own or the bot's previous moves, but fail to comprehensively exploit more complex dependency structures that are conditioned on both previous moves and their accompanying outcomes, despite the fact that people's own move choices exhibit these dependencies when playing against other humans (Experiment 1).
 
 
-# How many complete participants do we have for each bot strategy?
+
+## Methods 
+
+A total of `r participants$n` participants played matches consisting of `r NUM_ROUNDS` rounds of RPS. Each participant was paired up against one of `r bots` stable bot strategies for the duration of the match.
+
+The number of participants that played complete matches against each bot strategy is shown below. 
+
+
+```{r participants, echo=FALSE}
 data %>%
   filter(is_bot == 0) %>%
   group_by(bot_strategy) %>%
-  summarize(n = n() / NUM_ROUNDS)
+  summarize(n = n() / NUM_ROUNDS) %>%
+  group_by(bot_strategy) %>%
+  mutate(bot_strategy_plain = STRATEGY_LOOKUP[[bot_strategy]]) %>%
+  ungroup() %>%
+  select(bot_strategy_plain, n) %>%
+  kable(col.names = c("Strategy", "N"))
 
-length(unique(data$game_id))
+```
 
 
-# ANALYSIS ========================================================================================
+In detail, the strategies in the table above are as follows:
 
-# Histogram of empirical win count differential for each strategy
+* __Previous move (+)__: The bot has a 90% chance of making a *positive transition (+)* from its own previous move (i.e., rock -> paper, paper -> scissors, scissors -> rock). In other words, the bot usually transitions to the move that will beat what it just played (here and in all other strategies, the remaining 10% is distributed evenly across the other two transitions).
+
+* __Previous move (-)__: The bot has a 90% chance of making a *negative transition (-)* from its own previous move (i.e., rock -> scissors, scissors -> paper, paper -> rock). In other words, the bot usually transitions to the move that will *lose* to what it just played.
+
+* __Opponent previous move (+)__: The bot has a 90% chance of making a *positive transition* from its *opponent's* previous move. In other words, the bot usually transitions to the move that will beat what its opponent just played.
+
+* __Opponent previous move (0)__: The bot has a 90% chance of making a *null transition (0)* from its *opponent's* previous move. In other words, the bot usually copies what its opponent just played.
+
+* __Win-stay-lose-positive__: The bot has a 90% chance of making a null transition after each win, a positive transition after each loss, and a negative transition after each tie. 
+
+* __Win-positive-lose-negative__: The bot has a 90% chance of making a positive transition after each win, a negative transition after each loss, and a null transition after each tie.
+
+* __Outcome-transition dual dependency__: The bot has a 90% chance of making a particular transition (+, -, 0) for every combination of previous outcome *and* previous transition. For example, if the bot has just won from a positive transition, it might have a 90% chance of making a negative transition, but if it just won from a negative transition, it might instead have a 90% chance of a positive transition.
+
+The names for each strategy above are used throughout the remainder of the analyses.
+
+
+## Results
+
+### Distribution of win count differentials
+
+How well do participants fare against each bot strategy? Shown below is the distribution of participant win count differentials against each bot strategy, with summary statistics labeled for the distribution. 
+
+The expected performance if participants were playing at chance levels is shown in the final plot for comparison: it approximates a Gaussian centered at 0.
+
+
+```{r bot_distribution_analysis, echo=FALSE}
 # Get win count differentials for each bot strategy
 wcd_all = get_empirical_win_count_differential(data)
 wcd_null = get_null_win_count_differential(10000)
@@ -528,43 +483,69 @@ hist_win_nil_lose_positive = plot_win_count_differential(wcd_all[wcd_all$bot_str
 hist_win_positive_lose_negative = plot_win_count_differential(wcd_all[wcd_all$bot_strategy == "win_positive_lose_negative",], STRATEGY_LOOKUP[["win_positive_lose_negative"]], -50, NUM_ROUNDS, 180, 4)
 hist_outcome_transition_dual_dep = plot_win_count_differential(wcd_all[wcd_all$bot_strategy == "outcome_transition_dual_dependency",], STRATEGY_LOOKUP[["outcome_transition_dual_dependency"]], -50, NUM_ROUNDS, 100, 8)
 hist_null = plot_null_win_count_differential(wcd_null, "Chance behavior", -50, 300)
+```
 
 
+
+```{r bot_distributions, echo=FALSE, fig.width=12, fig.height=12, fig.align="center"}
 # Generate plots with patchwork
 hist_prev_move_positive + hist_prev_move_negative +
   hist_opponent_prev_move_positive + hist_opponent_prev_move_nil +
   hist_win_nil_lose_positive + hist_win_positive_lose_negative +
-  hist_outcome_transition_dual_dep +
-  hist_null +
-  plot_layout(ncol = 2)
+  hist_outcome_transition_dual_dep + hist_null +
+  plot_layout(ncol = 2, heights = unit(c(4), c("cm")), widths = unit(c(12), c("cm")))
+```
 
 
 
+### Summary of win count differentials
+
+The distributions above are summarized in the figure below, which shows mean and SEM of empirical win count differentials against each bot strategy. The red line indicates chance performance.
 
 
-# Mean + SE of win count differential for each strategy
+```{r bot_summary_analysis, echo=FALSE}
 wcd_summary = get_win_count_differential_summary(wcd_all)
+```
+
+
+
+```{r bot_summary, echo=FALSE, fig.width=12, fig.height=8, fig.align="center"}
 plot_win_count_differential_summary(wcd_summary)
+```
 
 
 
+### Learning rate against each bot strategy
 
-# Accuracy by round
-subject_block_data = get_subject_block_data(data, blocksize = 30)
+The above results suggest that participants were able to capitalize early on against the strategies where we see higher win count differentials, but may have struggled to figure out outcome-dependent strategies such as win-stay-lose-positive.
+
+
+```{r bot_win_pct_analysis, echo=FALSE}
+subject_block_data = get_subject_block_data(data, blocksize = BLOCKSIZE)
 block_data_summary = get_block_data_summary(subject_block_data)
-# TODO why are we missing subject data for some intermittent blocks?
-# block_data_summary %>% 
-#   filter(bot_strategy == "opponent_prev_move_nil") %>% 
-#   select(subjects) %>% 
-#   unique()
+```
 
+
+Below, we plot the average of participant win percentages in bins of N rounds over the course of the match (shown below with `r BLOCKSIZE` rounds per bin). The red line indicates chance performance.
+
+
+```{r bot_win_pct, echo=FALSE, fig.width=12, fig.height=8, fig.alignt="center"}
 plot_win_pct_by_block(block_data_summary)
+```
+
+
+Consistent with the overall win count differentials, we see that for the bot strategies that participants achieved a high win count differential against, participants perform well above chance from early on. Meanwhile, for the outcome-dependent strategies (win-stay-lose-positive and win-positive-lose-negative), participants only seem to figure out what the bot is doing in the final third or so of the match. Finally, for the outcome-transition dual dependency strategy, participants never perform above chance levels.
 
 
 
+### What do people learn about each bot?
 
-# Which aspects of each strategy did players detect?
+The win percentage data by bin above suggests that people have mostly figured out the dependency structure for the simpler bots from the beginning, but may not fully figure out the outcome-dependent bot strategies: their progress at the end may reflect figuring out single pieces of the bot's dependency structure. 
 
+To investigate this, below we plot overall participant win percentages against each bot strategy, based on the relevant conditioning outcome for that bot strategy. In the first two rows, we show win percentages against the previous move strategies based on bot previous moves and player previous moves, respectively. In the next two rows, we show win percentages against the previous outcome strategies (win, tie, loss) based on the bot's previous outcome, *as well as the outcome two rounds back* for the bot. Though the bot's strategy is only dependent on its previous outcome, people's win count percentages suggest that they fall into patterns of strong dependency on the outcome two rounds ago.
+
+
+```{r bot_dependency_win_pct_analysis, echo=FALSE}
 # 1. Bot previous move strategies
 bot_loss_prev_move = get_bot_prev_move_loss_pct(data)
 bot_loss_summary_prev_move = get_prev_move_win_pct_summary(bot_loss_prev_move)
@@ -581,23 +562,7 @@ player_win_summary_prev_move = get_prev_move_win_pct_summary(player_win_prev_mov
 opponent_prev_move_positive_plot = plot_prev_move_win_pct(player_win_summary_prev_move, "opponent_prev_move_positive", "Player previous move")
 opponent_prev_move_nil_plot = plot_prev_move_win_pct(player_win_summary_prev_move, "opponent_prev_move_nil", "Player previous move")
 
-# 3. Bot transition
-# bot_loss_transition = get_bot_transition_loss_pct(data)
-# bot_loss_summary_transition = get_bot_transition_loss_pct_summary(bot_loss_transition)
-
-# Generate plots
-# win_nil_lose_positive_plot = plot_transition_win_pct(bot_loss_summary_transition, "win_nil_lose_positive", "Bot transition")
-# win_positive_lose_negative_plot = plot_transition_win_pct(bot_loss_summary_transition, "win_positive_lose_negative", "Bot transition")
-
-# 4. Bot *previous* transition
-# bot_loss_prev_transition = get_bot_prev_transition_loss_pct(data)
-# bot_loss_summary_prev_transition = get_bot_transition_loss_pct_summary(bot_loss_prev_transition)
-
-# Generate plots
-# win_nil_lose_positive_plot_prev = plot_transition_win_pct(bot_loss_summary_prev_transition, "win_nil_lose_positive", "Bot previous transition")
-# win_positive_lose_negative_plot_prev = plot_transition_win_pct(bot_loss_summary_prev_transition, "win_positive_lose_negative", "Bot previous transition")
-
-# 5. Bot previous outcome
+# 3. Bot previous outcome
 bot_loss_prev_outcome = get_bot_prev_outcome_loss_pct(data)
 bot_loss_summary_prev_outcome = get_prev_outcome_win_pct_summary(bot_loss_prev_outcome)
 
@@ -606,7 +571,7 @@ win_nil_lose_positive_plot_outcome = plot_outcome_win_pct(bot_loss_summary_prev_
 win_positive_lose_negative_plot_outcome = plot_outcome_win_pct(bot_loss_summary_prev_outcome, "win_positive_lose_negative", "Bot previous outcome")
 
 
-# 6. Bot two outcomes back
+# 4. Bot two outcomes back
 bot_loss_prev2_outcome = get_bot_prev2_outcome_loss_pct(data)
 bot_loss_summary_prev2_outcome = get_prev_outcome_win_pct_summary(bot_loss_prev2_outcome)
 
@@ -615,42 +580,24 @@ win_nil_lose_positive_plot_outcome_prev = plot_outcome_win_pct(bot_loss_summary_
 win_positive_lose_negative_plot_outcome_prev = plot_outcome_win_pct(bot_loss_summary_prev2_outcome, "win_positive_lose_negative", "Bot ante-previous outcome")
 
 
+```
 
 
+
+```{r bot_dependency_win_pct, echo=FALSE, fig.width=12, fig.height=12, fig.align="center"}
 # Plot using patchwork
 prev_move_positive_plot + prev_move_negative_plot +
   opponent_prev_move_positive_plot + opponent_prev_move_nil_plot +
   win_nil_lose_positive_plot_outcome + win_positive_lose_negative_plot_outcome +
   win_nil_lose_positive_plot_outcome_prev + win_positive_lose_negative_plot_outcome_prev +
-  # win_nil_lose_positive_plot + win_positive_lose_negative_plot +
-  # win_nil_lose_positive_plot_prev + win_positive_lose_negative_plot_prev +
-  plot_layout(ncol = 2)
+  plot_layout(ncol = 2, heights = unit(c(5), c("cm")), widths = unit(c(12), c("cm")))
+
+```
+
+
+It's clear that while people have mostly figured out the full dependency for the simpler bots, they may only figure out single aspects of the outcome-dependent bot strategies. Most interestingly of all, people show a modest ability to win against the bot when the previous round was a tie, but a very strong win percentage when the outcome *two rounds ago* was a loss for the bot. 
 
 
 
-
-
-# ANALYSIS: Slider ================================================================================
-
-glimpse(slider_data)
-unique(slider_data$player_id)
-table(slider_data$player_id)
-
-slider_summary = slider_data %>%
-  inner_join(data, by = c("game_id", "player_id")) %>%
-  distinct(game_id, player_id, bot_strategy, statement, resp)
-slider_summary
-
-# TODO graph mean + SE for each strategy on each question (one plot for each question, showing strategies side by side)
-
-
-# ANALYSIS: Free Response =========================================================================
-
-fr_summary = fr_data %>%
-  inner_join(data, by = c("game_id", "player_id")) %>%
-  distinct(game_id, player_id, bot_strategy, free_resp_prompt, free_resp_answer)
-
-fr_summary
-
-# TODO make table of responses string wrapped and listed by strategy
+## Discussion
 

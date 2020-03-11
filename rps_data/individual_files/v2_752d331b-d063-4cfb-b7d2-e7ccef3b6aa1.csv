@@ -1,0 +1,2 @@
+game_id,version,round_index,player1_id,player2_id,round_begin_ts,player1_move,player2_move,player1_rt,player2_rt,player1_outcome,player2_outcome,player1_outcome_viewtime,player2_outcome_viewtime,player1_points,player2_points,player1_total,player2_total
+752d331b-d063-4cfb-b7d2-e7ccef3b6aa1,2,1,516a5ea8-97fc-4c22-8818-e1e8bc3b7e49,bot,1583527391677,paper,scissors,8425,0,loss,win,630,0,-1,3,0,0

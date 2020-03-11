@@ -1,0 +1,3 @@
+game_id,version,round_index,player1_id,player2_id,round_begin_ts,player1_move,player2_move,player1_rt,player2_rt,player1_outcome,player2_outcome,player1_outcome_viewtime,player2_outcome_viewtime,player1_points,player2_points,player1_total,player2_total
+1eff5fe0-aadb-4fd0-a6e5-196989ee050c,2,1,e71d63b7-faa7-4000-994d-98b8f616e418,bot,1583387331839,scissors,paper,8156,0,win,loss,1738,0,3,-1,0,0
+1eff5fe0-aadb-4fd0-a6e5-196989ee050c,2,2,e71d63b7-faa7-4000-994d-98b8f616e418,bot,1583387341875,paper,scissors,3796,0,loss,win,1097,0,-1,3,3,-1
