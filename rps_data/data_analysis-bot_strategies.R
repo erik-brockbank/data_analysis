@@ -38,6 +38,7 @@ STRATEGY_LOOKUP = list("prev_move_positive" = "Previous move (+)",
 
 # ANALYSIS FUNCTIONS ==============================================================================
 
+# Generic file reading function: more specific ones below
 read_data = function(filename) {
   data = read_csv(filename)
   return(data)
@@ -87,6 +88,52 @@ read_game_data = function(filename) {
     filter(!game_id %in% duplicate_games$game_id)
   
   return(data)
+}
+
+# Read in and process free response data
+read_free_resp_data = function(filename, game_data) {
+  data = read_csv(filename)
+  # Join with game data to get bot strategy, etc.
+  data = data %>%
+    inner_join(game_data, by = c("game_id", "player_id")) %>%
+    distinct(bot_strategy, game_id, player_id, free_resp_answer)
+  # Order bot strategies
+  data$bot_strategy = factor(data$bot_strategy, levels = STRATEGY_LEVELS)
+  # Add plain english strategy, string process free resposne answers
+  data = data %>%
+    group_by(bot_strategy, player_id) %>%
+    mutate(strategy = STRATEGY_LOOKUP[[bot_strategy]],
+           free_resp_answer = str_replace_all(free_resp_answer, "\n" , "[newline]")) %>%
+    ungroup()
+  
+  return(data)
+}
+
+# Read in and process slider data
+read_slider_data = function(filename, game_data) {
+  data = read_csv(filename)
+  data = data %>%
+    inner_join(game_data, by = c("game_id", "player_id")) %>%
+    distinct(game_id, player_id, bot_strategy, index, statement, resp)
+  # Order bot strategies
+  data$bot_strategy = factor(data$bot_strategy, levels = STRATEGY_LEVELS)
+  # Add plain english strategy
+  data = data %>%
+    group_by(bot_strategy, player_id, index) %>%
+    mutate(strategy = STRATEGY_LOOKUP[[bot_strategy]]) %>%
+    ungroup()
+  
+  return(data)
+}
+
+get_slider_summary = function(slider_data) {
+  slider_data %>%
+    group_by(statement, bot_strategy, strategy) %>%
+    summarize(n = n(),
+              mean_resp = mean(resp),
+              se = sd(resp) / sqrt(n),
+              se_upper = mean_resp + se,
+              se_lower = mean_resp - se)
 }
 
 get_empirical_win_count_differential = function(data) {
@@ -477,6 +524,34 @@ plot_outcome_win_pct = function(bot_loss_summary_prev_outcome, strategy, xlabel)
           axis.text.x = element_text(angle = 0, vjust = 1))
 }
 
+plot_slider_data = function(slider_data) {
+  label_width = 10
+  strategy_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width), 
+                      "prev_move_negative" = str_wrap(STRATEGY_LOOKUP[["prev_move_negative"]], label_width),
+                      "opponent_prev_move_nil" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_nil"]], label_width),
+                      "opponent_prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_positive"]], label_width),
+                      "win_nil_lose_positive" = str_wrap(STRATEGY_LOOKUP[["win_nil_lose_positive"]], label_width),
+                      "win_positive_lose_negative" = str_wrap(STRATEGY_LOOKUP[["win_positive_lose_negative"]], label_width),
+                      "outcome_transition_dual_dependency" = str_wrap(STRATEGY_LOOKUP[["outcome_transition_dual_dependency"]], label_width))
+  q = unique(slider_data$statement)
+  slider_data %>%
+    ggplot(aes(x = bot_strategy, y = mean_resp, color = bot_strategy)) +
+    geom_point(size = 6) +
+    geom_errorbar(aes(ymin = se_lower, ymax = se_upper), size = 1, width = 0.25) +
+    scale_color_viridis(discrete = T,
+                        name = element_blank(),
+                        labels = element_blank()) +
+    scale_x_discrete(name = element_blank(),
+                   labels = strategy_labels) +
+    ylim(c(1, 7)) +
+    labs(y = "Mean response (1: Strongly disagree, 7: Strongly agree)") +
+    ggtitle(str_wrap(q, 50)) +
+    default_plot_theme +
+    theme(axis.text.x = element_text(angle = 0, vjust = 1),
+          axis.title.x = element_blank(),
+          legend.position = "none")
+}
+
 
 
 # DATA PROCESSING =================================================================================
@@ -632,25 +707,45 @@ prev_move_positive_plot + prev_move_negative_plot +
 
 # ANALYSIS: Slider ================================================================================
 
-glimpse(slider_data)
-unique(slider_data$player_id)
-table(slider_data$player_id)
+slider_data = read_slider_data(SLIDER_FILE, data)
 
-slider_summary = slider_data %>%
-  inner_join(data, by = c("game_id", "player_id")) %>%
-  distinct(game_id, player_id, bot_strategy, statement, resp)
-slider_summary
+slider_summary = get_slider_summary(slider_data)
 
-# TODO graph mean + SE for each strategy on each question (one plot for each question, showing strategies side by side)
+# Generate plots
+slider_qs = unique(slider_summary$statement)
+
+q1_plot = slider_summary %>%
+  filter(statement == slider_qs[1]) %>%
+  plot_slider_data()
+
+q2_plot = slider_summary %>%
+  filter(statement == slider_qs[2]) %>%
+  plot_slider_data()
+
+q3_plot = slider_summary %>%
+  filter(statement == slider_qs[3]) %>%
+  plot_slider_data()
+
+q4_plot = slider_summary %>%
+  filter(statement == slider_qs[4]) %>%
+  plot_slider_data()
+
+q5_plot = slider_summary %>%
+  filter(statement == slider_qs[5]) %>%
+  plot_slider_data()
+
+
+q1_plot + q2_plot + q3_plot + q4_plot + q5_plot +
+  plot_layout(ncol = 2)
+  
 
 
 # ANALYSIS: Free Response =========================================================================
 
-fr_summary = fr_data %>%
-  inner_join(data, by = c("game_id", "player_id")) %>%
-  distinct(game_id, player_id, bot_strategy, free_resp_prompt, free_resp_answer)
+fr_data = read_free_resp_data(FREE_RESP_FILE, data)
 
-fr_summary
+fr_data %>%
+  arrange(bot_strategy, strategy, game_id, player_id, free_resp_answer) %>%
+  select(strategy, game_id, player_id, free_resp_answer)
 
-# TODO make table of responses string wrapped and listed by strategy
 
