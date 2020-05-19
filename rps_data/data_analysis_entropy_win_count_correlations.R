@@ -6,13 +6,16 @@
 #' If both players have high entropy on a given measure, then we should not expect high
 #' win count differential
 #' 
+#' NB: *THIS SCRIPT IS INACCURATE* because it calculates absolute win count differential rather than
+#' win count differential between the dyad member with the higher entropy and their opponent!
+#' Use `data_analysis_entropy_win_count_correlations_v2.R`
+#' 
 
 
 
-rm(list=ls())
+rm(list = ls())
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
-source('02_data_analysis-transition_entropy.R') # NB: nested sourcing here. this sources 01 which sources 00
-source('data_analysis_expected_value.R')
+source('data_analysis_expected_value.R') # NB: nested sourcing here. this sources 02 which sources 01 which sources 00...
 
 # GLOBALS
 xlab = "Minimum within-dyad Shannon entropy (S)"
@@ -22,79 +25,101 @@ xlab_win_diff = "Maximum expected win count differential"
 
 
 # Get data structure that combines win count differential and meaningful entropy values
-entropy_win_diff_comparison = data %>%
+# entropy_win_diff_comparison = data %>%
+#   # entropy over player move distributions
+#   inner_join(player.entropy, by = "player_id") %>%
+#   # entropy over player move distributions given previous move
+#   inner_join(player.prev.move.entropy, by = "player_id") %>%
+#   # entropy over player move distributions given opponent previous move
+#   inner_join(opponent.prev.move.entropy, by = "player_id") %>%
+#   # entropy over player transitions
+#   inner_join(player.transition.entropy, by = "player_id") %>%
+#   # entropy for distribution of transitions given player's previous outcome (this is among highest variances)
+#   inner_join(player.transition.outcome.entropy, by = "player_id") %>%
+#   # entropy for distribution of moves given player's previous two moves
+#   inner_join(player.prev.2move.entropy, by = "player_id") %>%
+#   # entropy for distribution of moves given player's previous move, opponent previous  move
+#   inner_join(player.opponent.prev.move.entropy, by = "player_id") %>%
+#   # entropy for distribution of transitions given player's previous transition, previous outcome
+#   inner_join(player.transition.prev.transition.prev.outcome.entropy, by = "player_id") %>%
+#   group_by(game_id, player_id, 
+#            entropy.0, entropy.1.player, entropy.1.opponent, 
+#            transition.entropy.0, transition.entropy.1.player.outcome, 
+#            entropy.2.player, entropy.2.player.opponent,
+#            transition.entropy.2.player.prev.transition.prev.outcome) %>%
+#   count(win_count = player_outcome == "win") %>%
+#   filter(win_count == TRUE) %>%
+#   group_by(game_id) %>%
+#   mutate(opp_win_count = ifelse(is.na(lag(n, 1)), lead(n, 1), lag(n, 1)),
+#          min_entropy_move_dist = min(entropy.0),
+#          min_entropy_prev_move = min(entropy.1.player),
+#          min_entropy_opponent_prev_move = min(entropy.1.opponent),
+#          min_entropy_transition = min(transition.entropy.0),
+#          min_entropy_transition_prev_outcome = min(transition.entropy.1.player.outcome),
+#          min_entropy_prev_2moves = min(entropy.2.player),
+#          min_entropy_player_opponent_prev_move = min(entropy.2.player.opponent),
+#          min_entropy_transition_prev_outcome_prev_transition = min(transition.entropy.2.player.prev.transition.prev.outcome)) %>%
+#   # filter(!is.na(opp_win_count)) %>%
+#   # mutate(win_diff = abs(n - opp_win_count)) %>%
+#   # NB: we don't do absolute value here because we need to make sure it's the differential for the minimum entropy player
+#   mutate(win_diff = (n - opp_win_count)) %>%
+#   group_by(game_id)
+#   select(game_id, player_id, 
+#          min_entropy_move_dist, min_entropy_prev_move, min_entropy_opponent_prev_move,
+#          min_entropy_transition, min_entropy_transition_prev_outcome,
+#          min_entropy_prev_2moves, min_entropy_player_opponent_prev_move,
+#          min_entropy_transition_prev_outcome_prev_transition,
+#          win_diff)
+
+entropy_win_diff_comparison_move_dist = data %>%
   # entropy over player move distributions
   inner_join(player.entropy, by = "player_id") %>%
-  # entropy over player move distributions given previous move
-  inner_join(player.prev.move.entropy, by = "player_id") %>%
-  # entropy over player move distributions given opponent previous move
-  inner_join(opponent.prev.move.entropy, by = "player_id") %>%
-  # entropy over player transitions
-  inner_join(player.transition.entropy, by = "player_id") %>%
-  # entropy for distribution of transitions given player's previous outcome (this is among highest variances)
-  inner_join(player.transition.outcome.entropy, by = "player_id") %>%
-  # entropy for distribution of moves given player's previous two moves
-  inner_join(player.prev.2move.entropy, by = "player_id") %>%
-  # entropy for distribution of moves given player's previous move, opponent previous  move
-  inner_join(player.opponent.prev.move.entropy, by = "player_id") %>%
-  # entropy for distribution of transitions given player's previous transition, previous outcome
-  inner_join(player.transition.prev.transition.prev.outcome.entropy, by = "player_id") %>%
-  group_by(game_id, player_id, 
-           entropy.0, entropy.1.player, entropy.1.opponent, 
-           transition.entropy.0, transition.entropy.1.player.outcome, 
-           entropy.2.player, entropy.2.player.opponent,
-           transition.entropy.2.player.prev.transition.prev.outcome) %>%
+  group_by(game_id, player_id, entropy.0) %>%
   count(win_count = player_outcome == "win") %>%
   filter(win_count == TRUE) %>%
   group_by(game_id) %>%
-  mutate(opp_win_count = lag(n, 1),
-         min_entropy_move_dist = min(entropy.0),
-         min_entropy_prev_move = min(entropy.1.player),
-         min_entropy_opponent_prev_move = min(entropy.1.opponent),
-         min_entropy_transition = min(transition.entropy.0),
-         min_entropy_transition_prev_outcome = min(transition.entropy.1.player.outcome),
-         min_entropy_prev_2moves = min(entropy.2.player),
-         min_entropy_player_opponent_prev_move = min(entropy.2.player.opponent),
-         min_entropy_transition_prev_outcome_prev_transition = min(transition.entropy.2.player.prev.transition.prev.outcome)) %>%
-  filter(!is.na(opp_win_count)) %>%
-  mutate(win_diff = abs(n - opp_win_count)) %>%
-  select(game_id, player_id, 
-         min_entropy_move_dist, min_entropy_prev_move, min_entropy_opponent_prev_move,
-         min_entropy_transition, min_entropy_transition_prev_outcome,
-         min_entropy_prev_2moves, min_entropy_player_opponent_prev_move,
-         min_entropy_transition_prev_outcome_prev_transition,
-         win_diff)
+  mutate(opp_win_count = ifelse(is.na(lag(n, 1)), lead(n, 1), lag(n, 1))) %>%
+  group_by(game_id) %>%
+  filter(entropy.0 == min(entropy.0)) %>%
+  mutate(win_diff = (n - opp_win_count)) %>%
+  rename(min_entropy_move_dist = entropy.0) %>%
+  select(game_id, player_id, min_entropy_move_dist, win_diff)
+  
+  
 
-
+  
+  
 
 # Get data structure that combines win count differential and meaningful expected win count differential values
-expected_win_empirical_win_diff_comparison = data %>%
-  # exp. win diff over player move distributions
-  inner_join(player_utils, by = "player_id") %>%
-  # exp. win diff over player move distributions given previous move
-  inner_join(player_prev_move_utils, by = "player_id") %>%
-  # exp. win diff over player move distributions given opponent previous move
-  inner_join(opponent_prev_move_utils, by = "player_id") %>%
-  # exp. win diff over player transitions
-  inner_join(player_transition_utils, by = "player_id") %>%
-  # exp. win diff for distribution of transitions given player's previous outcome (this is among highest variances)
-  inner_join(player_transition_prev_outcome_utils, by = "player_id") %>%
-  group_by(game_id, player_id, win_diff.x, win_diff.y, win_diff.x.x, win_diff.y.y, win_diff) %>%
-  count(win_count = player_outcome == "win") %>%
-  filter(win_count == TRUE) %>%
-  group_by(game_id) %>%
-  mutate(opp_win_count = lag(n, 1),
-         exp_win_diff_move_dist = max(win_diff.x),
-         exp_win_diff_prev_move = max(win_diff.y),
-         exp_win_diff_opponent_prev_move = max(win_diff.x.x),
-         exp_win_diff_transition = max(win_diff.y.y),
-         exp_win_diff_transition_prev_outcome = max(win_diff)) %>%
-  filter(!is.na(opp_win_count)) %>%
-  mutate(win_diff = abs(n - opp_win_count)) %>%
-  select(game_id, player_id, 
-         exp_win_diff_move_dist, exp_win_diff_prev_move, exp_win_diff_opponent_prev_move,
-         exp_win_diff_transition, exp_win_diff_transition_prev_outcome,
-         win_diff)
+# expected_win_empirical_win_diff_comparison = data %>%
+#   # exp. win diff over player move distributions
+#   inner_join(player_utils, by = "player_id") %>%
+#   # exp. win diff over player move distributions given previous move
+#   inner_join(player_prev_move_utils, by = "player_id") %>%
+#   # exp. win diff over player move distributions given opponent previous move
+#   inner_join(opponent_prev_move_utils, by = "player_id") %>%
+#   # exp. win diff over player transitions
+#   inner_join(player_transition_utils, by = "player_id") %>%
+#   # exp. win diff for distribution of transitions given player's previous outcome (this is among highest variances)
+#   inner_join(player_transition_prev_outcome_utils, by = "player_id") %>%
+#   group_by(game_id, player_id, win_diff.x, win_diff.y, win_diff.x.x, win_diff.y.y, win_diff) %>%
+#   count(win_count = player_outcome == "win") %>%
+#   filter(win_count == TRUE) %>%
+#   group_by(game_id) %>%
+#   mutate(opp_win_count = lag(n, 1),
+#          exp_win_diff_move_dist = max(win_diff.x),
+#          exp_win_diff_prev_move = max(win_diff.y),
+#          exp_win_diff_opponent_prev_move = max(win_diff.x.x),
+#          exp_win_diff_transition = max(win_diff.y.y),
+#          exp_win_diff_transition_prev_outcome = max(win_diff)) %>%
+#   filter(!is.na(opp_win_count)) %>%
+#   # mutate(win_diff = abs(n - opp_win_count)) %>%
+#   # NB: we don't do absolute value here because we need to make sure it's the differential for the minimum entropy player
+#   mutate(win_diff = (n - opp_win_count)) %>%
+#   select(game_id, player_id, 
+#          exp_win_diff_move_dist, exp_win_diff_prev_move, exp_win_diff_opponent_prev_move,
+#          exp_win_diff_transition, exp_win_diff_transition_prev_outcome,
+#          win_diff)
 
 
 # Scatter plot entropy vals against win count differential

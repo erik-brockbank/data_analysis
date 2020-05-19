@@ -77,3 +77,4 @@ chisq.test(seq.counts3$n, p = seq.counts3$pct_expected)
 
 
 
+

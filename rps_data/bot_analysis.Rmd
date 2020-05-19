@@ -670,7 +670,7 @@ prev_move_positive_plot + prev_move_negative_plot +
 ```
 
 
-It's clear that while people have mostly figured out the full dependency for the simpler bots, they may only figure out single aspects of the outcome-dependent bot strategies. Most interestingly of all, people show a modest ability to win against the bot when the previous round was a tie, but a very strong win percentage when the outcome *two rounds ago* was a loss for the bot. 
+It's clear that while people have mostly figured out the full dependency for the simpler bots, they may only figure out single aspects of the outcome-dependent bot strategies. Most interestingly of all, people show a modest ability to win against the bot when the previous round was a tie, but a very strong win percentage when the outcome *two rounds ago* was a loss for the bot. This seems to reflect unique adaptations to multi-round patterns in bot behavior that are contingent on transitions and outcomes.
 
 
 

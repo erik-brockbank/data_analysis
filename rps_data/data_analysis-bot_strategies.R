@@ -656,23 +656,7 @@ player_win_summary_prev_move = get_prev_move_win_pct_summary(player_win_prev_mov
 opponent_prev_move_positive_plot = plot_prev_move_win_pct(player_win_summary_prev_move, "opponent_prev_move_positive", "Player previous move")
 opponent_prev_move_nil_plot = plot_prev_move_win_pct(player_win_summary_prev_move, "opponent_prev_move_nil", "Player previous move")
 
-# 3. Bot transition
-# bot_loss_transition = get_bot_transition_loss_pct(data)
-# bot_loss_summary_transition = get_bot_transition_loss_pct_summary(bot_loss_transition)
-
-# Generate plots
-# win_nil_lose_positive_plot = plot_transition_win_pct(bot_loss_summary_transition, "win_nil_lose_positive", "Bot transition")
-# win_positive_lose_negative_plot = plot_transition_win_pct(bot_loss_summary_transition, "win_positive_lose_negative", "Bot transition")
-
-# 4. Bot *previous* transition
-# bot_loss_prev_transition = get_bot_prev_transition_loss_pct(data)
-# bot_loss_summary_prev_transition = get_bot_transition_loss_pct_summary(bot_loss_prev_transition)
-
-# Generate plots
-# win_nil_lose_positive_plot_prev = plot_transition_win_pct(bot_loss_summary_prev_transition, "win_nil_lose_positive", "Bot previous transition")
-# win_positive_lose_negative_plot_prev = plot_transition_win_pct(bot_loss_summary_prev_transition, "win_positive_lose_negative", "Bot previous transition")
-
-# 5. Bot previous outcome
+# 3. Bot previous outcome
 bot_loss_prev_outcome = get_bot_prev_outcome_loss_pct(data)
 bot_loss_summary_prev_outcome = get_prev_outcome_win_pct_summary(bot_loss_prev_outcome)
 
@@ -680,15 +664,13 @@ bot_loss_summary_prev_outcome = get_prev_outcome_win_pct_summary(bot_loss_prev_o
 win_nil_lose_positive_plot_outcome = plot_outcome_win_pct(bot_loss_summary_prev_outcome, "win_nil_lose_positive", "Bot previous outcome")
 win_positive_lose_negative_plot_outcome = plot_outcome_win_pct(bot_loss_summary_prev_outcome, "win_positive_lose_negative", "Bot previous outcome")
 
-
-# 6. Bot two outcomes back
+# 4. Bot two outcomes back
 bot_loss_prev2_outcome = get_bot_prev2_outcome_loss_pct(data)
 bot_loss_summary_prev2_outcome = get_prev_outcome_win_pct_summary(bot_loss_prev2_outcome)
 
 # Generate plots
 win_nil_lose_positive_plot_outcome_prev = plot_outcome_win_pct(bot_loss_summary_prev2_outcome, "win_nil_lose_positive", "Bot ante-previous outcome")
 win_positive_lose_negative_plot_outcome_prev = plot_outcome_win_pct(bot_loss_summary_prev2_outcome, "win_positive_lose_negative", "Bot ante-previous outcome")
-
 
 
 
