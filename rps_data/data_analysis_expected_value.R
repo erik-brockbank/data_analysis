@@ -40,6 +40,17 @@ get_expected_win_count_differential_trans = function(player_summary) {
     mutate(win_diff = max_util * RPS_ROUNDS)
 }
 
+# # Get maximum expected win count differential based on transition probabilities *with respect to opponent's prevoius move*
+# # TODO again this is identical to the above but for column names...
+# get_expected_win_count_differential_trans_cournot = function(player_summary) {
+#   player_summary %>%
+#     group_by(player_id) %>%
+#     summarize(max_util = max(
+#       rowSums(matrix(rep(p.transition, 3), nrow = 3, byrow = T) * OUTCOME_MATRIX))) %>%
+#     mutate(win_diff = max_util * RPS_ROUNDS)
+#   
+# }
+
 # Get maximum expected win count differential based on distribution of moves given opponent's previous move
 get_expected_win_count_differential_opponent_prev_move = function(player_summary) {
   player_summary %>%
@@ -146,6 +157,7 @@ summary_labels = c("empirical" = str_wrap("Empirical results", legend.width),
                    "null_sample" = str_wrap("Random behavior", legend.width),
                    "move_probability" = str_wrap("Choice baserate (R/P/S)", legend.width),
                    "trans_probability" = str_wrap("Transition baserate (+/-/0)", legend.width),
+                   "cournot_probability" = str_wrap("Opponent transition baserate (+/-/0)", legend.width),
                    "opponent_prev_move_probability" = str_wrap("Choice given opponent's prior choice", legend.width),
                    "prev_move_probability" = str_wrap("Choice given player's prior choice", legend.width),
                    "player_transition_prev_outcome_probability" = str_wrap("Transition given prior outcome (W/L/T)", legend.width),
@@ -157,21 +169,21 @@ summary_values_legend = c("player_transition_prev_transition_prev_outcome_probab
                    "prev_move_opponent_prev_move_probability", "prev_2move_probability",
                    "player_transition_prev_outcome_probability",
                    "prev_move_probability", "opponent_prev_move_probability",
-                   "trans_probability", "move_probability",
+                   "trans_probability", "cournot_probability", 
+                   "move_probability",
                    "null_sample",
-                   "empirical"
-                   )
+                   "empirical")
 
-summary_values = c(#"empirical", 
-                   #"null_sample", 
-  "move_probability", "trans_probability", 
+summary_values = c("move_probability", 
+  "cournot_probability", "trans_probability",
   "opponent_prev_move_probability", "prev_move_probability",
   "player_transition_prev_outcome_probability",
   "prev_2move_probability", "prev_move_opponent_prev_move_probability",
   "player_transition_prev_transition_prev_outcome_probability")
 
 x_values = c("empirical", 
-  "null_sample", "move_probability", "trans_probability", 
+  "null_sample", "move_probability", 
+  "cournot_probability", "trans_probability", 
   "opponent_prev_move_probability", "prev_move_probability",
   "player_transition_prev_outcome_probability",
   "prev_2move_probability", "prev_move_opponent_prev_move_probability",
@@ -208,16 +220,12 @@ plot_win_differential_summary = function(win_diff_summary, win_diff_empirical, w
                      labels = summary_labels) +
     scale_color_viridis(discrete = TRUE,
                         name = element_blank()) +
-                        #labels = summary_labels,
-                        #breaks = summary_values_legend) +
     individ_plot_theme +
-    theme(#axis.text.x = element_blank(),
-          plot.title = element_text(size = 32, face = "bold"),
+    theme(plot.title = element_text(size = 32, face = "bold"),
           axis.title.y = element_text(size = 24, face = "bold"),
           axis.text.x = element_text(size = 20, face = "bold", angle = 0, vjust = 1),
           axis.text.y = element_text(face = "bold", size = 20),
           legend.position = "none")
-    #coord_flip()
 }
 
 
@@ -238,6 +246,12 @@ plot.win.differentials(player_utils, "Distribution of win count differentials", 
 player_transition_summary = get.player.transition.dist(data)
 # get max utility value for opponent of each player based on each player's transition probabilities
 player_transition_utils = get_expected_win_count_differential_trans(player_transition_summary)
+
+## 2.5 Distribution of transitions *relative to opponent*, i.e. Cournot responses (3 cells)
+# get overall probability of each transition (for each player)
+player_transition_cournot_summary = get.player.transition.cournot.dist(data)
+# get max utility value for opponent of each player based on each player's transition probabilities
+player_transition_cournot_utils = get_expected_win_count_differential_trans(player_transition_cournot_summary)
 
 
 ## 3. Distribution of moves given opponent's previous move (9 cells)
@@ -286,10 +300,9 @@ player_transition_prev_transition_prev_outcome_utils = get_expected_win_count_di
 
 # combine summary win count differentials for empirical data, null sample, and expected value calcs
 win_count_diff_summary = bind_rows(
-  #get_win_count_differential_summary(win_diff_empirical, "empirical"),
-  #get_win_count_differential_summary(win_diff_null, "null_sample"),
   get_win_count_differential_summary(player_utils, "move_probability"),
   get_win_count_differential_summary(player_transition_utils, "trans_probability"),
+  get_win_count_differential_summary(player_transition_cournot_utils, "cournot_probability"),
   get_win_count_differential_summary(opponent_prev_move_utils, "opponent_prev_move_probability"),
   get_win_count_differential_summary(player_prev_move_utils, "prev_move_probability"),
   get_win_count_differential_summary(player_transition_prev_outcome_utils, "player_transition_prev_outcome_probability"),
@@ -300,7 +313,7 @@ win_count_diff_summary = bind_rows(
 
 
 # plot summary of win differentials for EV alongside empirical and null data
-plot_win_differential_summary(win_count_diff_summary, win_diff_empirical, win_diff_null)
+plot_win_differential_summary(win_count_diff_summary, win_count_diff_empirical, win_count_diff_null)
 
 
 

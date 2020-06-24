@@ -56,6 +56,33 @@ get.player.transition.dist = function(data) {
            p.transition = n / total.transitions)
 }
 
+#' Function to get marginal probability of each transition (+/-/0) *relative to opponent's previous move*
+#' for each player
+get.player.transition.cournot.dist = function(data) {
+  data %>%
+    group_by(player_id) %>%
+    mutate(prev.move = lag(player_move, 1)) %>%
+    filter(!is.na(prev.move)) %>% # lag call above sets NA for lag on first move: ignore it here
+    group_by(game_id, round_index) %>%
+    # opponent's previous move is previous row's prev.move for one of the players, next row's prev.move for the other
+    mutate(opponent.prev.move = ifelse(is.na(lag(player_move, 1)), lead(prev.move, 1), lag(prev.move, 1))) %>% # opponent's one move back (previous move)
+    filter(opponent.prev.move != "none" & player_move != "none") %>% # ignore "none" moves for this aggregation
+    group_by(player_id) %>%
+    # NB: this can be slow to execute
+    mutate(player.transition.cournot = case_when(opponent.prev.move == player_move ~ "0",
+                                                 ((opponent.prev.move == "rock" & player_move == "paper") |
+                                                    (opponent.prev.move == "paper" & player_move == "scissors") |
+                                                    (opponent.prev.move == "scissors" & player_move == "rock")) ~ "+",
+                                                 ((opponent.prev.move == "rock" & player_move == "scissors") |
+                                                    (opponent.prev.move == "paper" & player_move == "rock") |
+                                                    (opponent.prev.move == "scissors" & player_move == "paper")) ~ "-")) %>%
+    count(player.transition.cournot) %>%
+    mutate(total.transitions = sum(n),
+           p.transition = n / total.transitions)
+    
+    
+}
+
 #' Function to get the distribution over each player's *previous* transition (+/-/0)
 #' Note this will be almost identical to the function above, except
 #' it will evaluate the transition between a player's move two moves back and their

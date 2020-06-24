@@ -11,6 +11,7 @@ source('00_data_processing.R') # script used for data processing/cleanup
 
 # GLOBALS 
 MAX_LAG = 10
+ROUNDS = 300
 
 
 # ANALYSIS FUNCTIONS ===========================================================
@@ -35,17 +36,48 @@ get_game_acf = function(unique_game_data, max_lag) {
   unique_game_data = unique_game_data %>%
     mutate(points_symmetric = case_when(player_outcome == "win" ~ 1,
                                         player_outcome == "loss" ~ -1,
-                                        player_outcome == "tie" ~ 0))
+                                        player_outcome == "tie" ~ 0)) %>%
+    filter(!is.na(points_symmetric)) # TODO: why do we have NA outcomes?
   # fill in data frame
   for (game in unique(unique_game_data$game_id)) {
     game_data = unique_game_data %>%
-      # TODO what's going on with these na outcomes???
-      filter(game_id == game & !is.na(player_outcome))
+      filter(game_id == game)
     game_acf = acf(game_data$points_symmetric, lag.max = max_lag, plot = F)
     
     acf_agg = rbind(acf_agg, data.frame(game = game, lag = seq(0, max_lag), acf = game_acf[[1]]))
   }
   return(acf_agg)
+}
+
+# Function to generate a sample set of `rounds` outcomes
+get_sample_game = function(rounds) {
+  sample(c("loss", "tie", "win"), rounds, replace = T)
+}
+
+# Function to add a winning and losing streak of length `streak_length` to the `sample_game`
+add_game_streaks = function(sample_game, streak_length) {
+  # randomly set first streak_length games to be wins and middle streak_length games to be losses
+  sample_game[1:streak_length] = "win"
+  # sample_game[101:(100 + streak_length)] = "loss"
+  sample_game[101:(100 + streak_length)] = "win"
+  return(sample_game)
+}
+
+# Function to generate acf of simulated games for `n_particpants` playing `rounds`
+get_sample_acf = function(streak_length, rounds, n_participants) {
+  sample_df = data.frame(game_id = numeric(), round_index = numeric(), player_outcome = character(),
+                         stringsAsFactors = F)
+  
+  for (game in seq(1, n_participants)) {
+    sample_game = get_sample_game(rounds)
+    sample_game = add_game_streaks(sample_game, streak_length)
+    
+    sample_df = rbind(sample_df, 
+                      data.frame(game_id = game, round_index = seq(1, rounds), player_outcome = sample_game,
+                                 stringsAsFactors = F))
+  }
+  
+  return(sample_df)
 }
 
 
@@ -56,11 +88,16 @@ plot_acf = function(acf_data) {
     group_by(lag) %>%
     summarize(mean_acf = mean(acf))
   
+  ci_thresh = 2 / sqrt(ROUNDS) # num. SDs from 0 over sqrt(N) obs to get 95% CI on mean of 0 auto-corr
+  
   acf_data %>%
     ggplot(aes(x = lag, y = acf)) +
     geom_jitter(aes(color = "ind"), alpha = 0.5, width = 0.1, size = 2) +
     geom_point(data = summary_acf, aes(x = lag, y = mean_acf, color = "mean"), size = 4) +
     scale_x_continuous(breaks = seq(0, max(acf_data$lag))) +
+    # significance thresholds
+    geom_hline(yintercept = ci_thresh, linetype = "dashed", size = 1, color = "black") +
+    geom_hline(yintercept = -ci_thresh, linetype = "dashed", size = 1, color = "black") +
     scale_color_viridis(discrete = T,
                         labels = c("ind" = "Individual dyads", "mean" = "Average across dyads"),
                         # Set color range to avoid purple and yellow contrasts...
@@ -75,33 +112,10 @@ plot_acf = function(acf_data) {
 
 # ANALYSIS =====================================================================
 
-# 1. Overall outcome analysis
-# Do people have disproportionate numbers of wins/losses overall?
-# Chi-squared test of win/loss/tie counts for each dyad
-chisq_tests = data.frame(game_id = character(), chisq = numeric(), p_val = numeric())
-outcome.summary = data %>%
-  group_by(game_id, round_index) %>%
-  filter(row_number() == 1) %>%
-  ungroup() %>%
-  group_by(game_id) %>%
-  count(player_outcome) %>%
-  filter(!is.na(player_outcome))
+# 1. Auto-correlation (temporal outcome analysis)
 
-for (game in unique(outcome.summary$game_id)) {
-  game_data = outcome.summary %>%
-    filter(game_id == game)
-  tst = chisq.test(game_data$n)
-  chisq_tests = rbind(chisq_tests, data.frame(game_id = game, chisq = tst$statistic, p_val = tst$p.value))
-}
-chisq_tests
-
-
-
-# 2. Auto-correlation (temporal outcome analysis)
-
-# Remove 100-round dyads and select only a single player within each game to avoid redundancy
-
-unique(data$game_id)
+# Select only a single player within each dyad (their opponent should have identical acf)
+length(unique(data$game_id))
 unique_game_data = get_unique_game_data(data)
 
 
@@ -111,6 +125,43 @@ acf_agg = get_game_acf(unique_game_data, MAX_LAG)
 # Plot ACF data
 plot_acf(acf_agg)
 
+
+# 2. Auto-correlation for top-N win count differential dyads
+win_count_diff_empirical = get_emp_win_differential(data)
+
+win_count_diff_empirical_top = win_count_diff_empirical %>%
+  top_n(win_diff, n = 10)
+unique(win_count_diff_empirical_top$game_id)
+
+unique_game_data_top = unique_game_data %>%
+  filter(game_id %in% win_count_diff_empirical_top$game_id)
+
+# Get ACF data
+acf_top = get_game_acf(unique_game_data_top, MAX_LAG)
+
+# Plot ACF data
+plot_acf(acf_top)
+
+
+# 3. What kind of streaks are needed to produce significant auto-correlations?
+streak_length = 30
+streak_pct = (2 * streak_length) / ROUNDS
+
+sample_acf_data = get_sample_acf(streak_length, ROUNDS, 58)
+
+# Get ACF data
+acf_sample = get_game_acf(sample_acf_data, MAX_LAG)
+
+# Plot ACF data
+plot_acf(acf_sample)
+
+# Take-aways: 
+# streak_pct needs to be > 10% to detect significant auto-correlations
+# by 20% it's very visible
+
+
+
+# APPENDIX =====================================================================
 
 # What's going on with the high auto-correlation dyad?
 outlier = acf_agg %>%

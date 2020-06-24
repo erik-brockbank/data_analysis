@@ -198,7 +198,8 @@ get_block_data_summary = function(subject_block_data) {
 # Get loss percent for each bot dependent on their previous move
 get_bot_prev_move_loss_pct = function(data) {
   data %>%
-    filter(bot_strategy == "prev_move_positive" | bot_strategy == "prev_move_negative") %>%
+    filter(# round_index <= 15, # TODO exploratory
+           bot_strategy == "prev_move_positive" | bot_strategy == "prev_move_negative") %>%
     group_by(player_id) %>%
     mutate(prev_move = lag(player_move, 1)) %>%
     filter(is_bot == 1, # look only at bot prev moves
@@ -209,13 +210,14 @@ get_bot_prev_move_loss_pct = function(data) {
     filter(!is.na(player_outcome)) %>% # TODO why do we have NA game outcomes??
     group_by(bot_strategy, game_id, player_id, prev_move) %>%
     # player win percent calculated as bot loss percent
-    summarize(player_win_pct = n[player_outcome == "loss"] / sum(n))
+    summarize(player_win_pct = max(0, n[player_outcome == "loss"]) / max(1, sum(n)))
 }
 
 # Get win percent for each player dependent on their own previous move
 get_player_prev_move_win_pct = function(data) {
   data %>%
     filter(is_bot == 0,
+           # round_index <= 15, # TODO exploratory
            bot_strategy == "opponent_prev_move_nil" | bot_strategy == "opponent_prev_move_positive") %>%
     group_by(player_id) %>%
     mutate(prev_move = lag(player_move, 1)) %>%
@@ -226,14 +228,15 @@ get_player_prev_move_win_pct = function(data) {
     filter(!is.na(player_outcome)) %>% # TODO why do we have NA game outcomes??
     group_by(bot_strategy, game_id, player_id, prev_move) %>%
     # player win percent calculated using player win outcomes
-    summarize(player_win_pct = n[player_outcome == "win"] / sum(n))
+    summarize(player_win_pct = max(0, n[player_outcome == "win"]) / max(1, sum(n)))
 }
 
 
 # Get loss percent for each bot dependent on the bot's previous outcome
 get_bot_prev_outcome_loss_pct = function(data) {
   data %>%
-    filter(bot_strategy == "win_nil_lose_positive" | bot_strategy == "win_positive_lose_negative") %>%
+    filter(# round_index >= 270, # TODO exploratory
+      bot_strategy == "win_nil_lose_positive" | bot_strategy == "win_positive_lose_negative") %>%
     group_by(player_id) %>%
     mutate(prev_outcome = lag(player_outcome, 1)) %>%
     filter(is_bot == 1, # look only at bot prev moves
@@ -243,7 +246,7 @@ get_bot_prev_outcome_loss_pct = function(data) {
     filter(!is.na(player_outcome)) %>% # TODO why do we have NA game outcomes??
     group_by(bot_strategy, game_id, player_id, prev_outcome) %>%
     # player win percent calculated as bot loss percent
-    summarize(player_win_pct = n[player_outcome == "loss"] / sum(n))
+    summarize(player_win_pct = max(0, n[player_outcome == "loss"]) / max(1, sum(n)))
 }
 
 # Get loss percent for each bot dependent on the bot's outcome two rounds ago
@@ -463,19 +466,27 @@ plot_win_pct_by_block = function(block_data_summary) {
                       "win_positive_lose_negative" = str_wrap(STRATEGY_LOOKUP[["win_positive_lose_negative"]], label_width),
                       "outcome_transition_dual_dependency" = str_wrap(STRATEGY_LOOKUP[["outcome_transition_dual_dependency"]], label_width))
   
+  block_labels = c("1" = "30", "2" = "60", "3" = "90", "4" = "120", "5" = "150",
+                   "6" = "180", "7" = "210", "8" = "240", "9" = "270", "10" = "300")
+  
   block_data_summary %>%
     ggplot(aes(x = round_block, y = mean_win_pct, color = bot_strategy)) +
     geom_point(size = 6, alpha = 0.75) +
     geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), size = 1, width = 0.25, alpha = 0.75) +
     geom_hline(yintercept = 1 / 3, linetype = "dashed", color = "red", size = 1) +
-    labs(x = "Block of N rounds", y = "Mean win percentage") +
+    labs(x = "Game round", y = "Mean win percentage") +
     ggtitle("Participant win percentage against bot strategies") +
     scale_color_viridis(discrete = T,
                         name = element_blank(),
                         labels = strategy_labels) +
+    scale_x_continuous(labels = block_labels, breaks = seq(1:10)) +
     default_plot_theme +
-    theme(axis.text.x = element_blank(),
-          legend.text = element_text(face = "plain"))
+    theme(#axis.text.x = element_blank(),
+          legend.text = element_text(face = "bold", size = 14),
+          legend.position = "right",
+          legend.spacing.y = unit(5.0, 'cm'),
+          #legend.key = element_rect(size = 5),
+          legend.key.size = unit(4, 'lines'))
 }
 
 # Plot average win percent based on previous move dependency
@@ -486,6 +497,9 @@ plot_prev_move_win_pct = function(bot_loss_summary_prev_move, strategy, xlabel) 
     geom_bar(stat = "identity", alpha = 0.5, color = "grey50", fill = "steelblue") +
     geom_errorbar(aes(ymin = se_lower, ymax = se_upper), width = 0.5, size = 1, color = "midnightblue") +
     geom_hline(yintercept = 1 / 3, linetype = "dashed", color = "red", size = 1) +
+    scale_y_continuous(labels = seq(0, 0.8, by = 0.2),
+                       breaks = seq(0, 0.8, by = 0.2),
+                       limits = c(0, 0.8)) +
     labs(x = xlabel, y = "Avg. player win pct.") +
     ggtitle(STRATEGY_LOOKUP[[strategy]]) +
     default_plot_theme +
@@ -502,6 +516,9 @@ plot_transition_win_pct = function(bot_loss_summary_transition, strategy, xlabel
     geom_bar(stat = "identity", alpha = 0.5, color = "grey50", fill = "steelblue") +
     geom_errorbar(aes(ymin = se_lower, ymax = se_upper), width = 0.5, size = 1, color = "midnightblue") +
     geom_hline(yintercept = 1 / 3, linetype = "dashed", color = "red", size = 1) +
+    scale_y_continuous(labels = seq(0, 0.8, by = 0.2),
+                       breaks = seq(0, 0.8, by = 0.2),
+                       limits = c(0, 0.8)) +
     labs(x = xlabel, y = "Avg. player win pct") +
     ggtitle(STRATEGY_LOOKUP[[strategy]]) +
     default_plot_theme +
@@ -517,6 +534,9 @@ plot_outcome_win_pct = function(bot_loss_summary_prev_outcome, strategy, xlabel)
     geom_bar(stat = "identity", alpha = 0.5, color = "grey50", fill = "steelblue") +
     geom_errorbar(aes(ymin = se_lower, ymax = se_upper), width = 0.5, size = 1, color = "midnightblue") +
     geom_hline(yintercept = 1 / 3, linetype = "dashed", color = "red", size = 1) +
+    scale_y_continuous(labels = seq(0, 0.8, by = 0.2),
+                       breaks = seq(0, 0.8, by = 0.2),
+                       limits = c(0, 0.8)) +
     labs(x = xlabel, y = "Avg. player win pct") +
     ggtitle(STRATEGY_LOOKUP[[strategy]]) +
     default_plot_theme +
@@ -678,9 +698,7 @@ win_positive_lose_negative_plot_outcome_prev = plot_outcome_win_pct(bot_loss_sum
 prev_move_positive_plot + prev_move_negative_plot +
   opponent_prev_move_positive_plot + opponent_prev_move_nil_plot +
   win_nil_lose_positive_plot_outcome + win_positive_lose_negative_plot_outcome +
-  win_nil_lose_positive_plot_outcome_prev + win_positive_lose_negative_plot_outcome_prev +
-  # win_nil_lose_positive_plot + win_positive_lose_negative_plot +
-  # win_nil_lose_positive_plot_prev + win_positive_lose_negative_plot_prev +
+  # win_nil_lose_positive_plot_outcome_prev + win_positive_lose_negative_plot_outcome_prev +
   plot_layout(ncol = 2)
 
 
