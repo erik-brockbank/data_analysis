@@ -23,7 +23,6 @@ DATA_FILE = "rps_v2_data.csv" # name of file containing full dataset for all rou
 FREE_RESP_FILE = "rps_v2_data_freeResp.csv" # file containing free response data by participant
 SLIDER_FILE = "rps_v2_data_sliderData.csv" # file containing slider Likert data by participant
 NUM_ROUNDS = 300 # number of rounds in each complete game
-BLOCKSIZE = NUM_ROUNDS / 10 # number of bins to use for segmented analysis of performance over the full game
 STRATEGY_LEVELS = c("prev_move_positive", "prev_move_negative",
                     "opponent_prev_move_positive", "opponent_prev_move_nil",
                     "win_nil_lose_positive", "win_positive_lose_negative",
