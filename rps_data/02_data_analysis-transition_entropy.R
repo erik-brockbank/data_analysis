@@ -56,7 +56,6 @@ get.player.transition.dist = function(data) {
            p.transition = n / total.transitions)
 }
 
-<<<<<<< HEAD
 #' Function to get marginal probability of each transition (+/-/0) *relative to opponent's previous move*
 #' for each player
 get.player.transition.cournot.dist = function(data) {
@@ -84,8 +83,6 @@ get.player.transition.cournot.dist = function(data) {
     
 }
 
-=======
->>>>>>> 90dd038de111de39b8cefa609f837c9ed98b4579
 #' Function to get the distribution over each player's *previous* transition (+/-/0)
 #' Note this will be almost identical to the function above, except
 #' it will evaluate the transition between a player's move two moves back and their

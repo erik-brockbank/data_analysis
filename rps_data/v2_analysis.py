@@ -11,11 +11,7 @@ from os.path import join
 from operator import itemgetter
 
 EXPERIMENT = "rps_v2" # useful identifier for experiment data: modify this to reflect the particular experiment
-<<<<<<< HEAD
 DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/" # path to data files: modify as needed for particular experiments
-=======
-DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/v2/" # path to data files: modify as needed for particular experiments
->>>>>>> 90dd038de111de39b8cefa609f837c9ed98b4579
 
 
 files = [f for f in listdir(DATA_PATH) if f.endswith(".json")
