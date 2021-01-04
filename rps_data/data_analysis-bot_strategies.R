@@ -1,16 +1,16 @@
-#' 
+#'
 #' RPS bot analysis
 #' Examines human performance against bot opponents with varying strategies
-#' 
+#'
 
 
 
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
 rm(list = ls())
-library(tidyverse)
 library(viridis)
 library(patchwork)
 library(ggtern)
+library(tidyverse)
 
 
 
@@ -50,7 +50,7 @@ read_data = function(filename) {
 read_game_data = function(filename) {
   data = read_csv(filename)
   data$bot_strategy = factor(data$bot_strategy, levels = STRATEGY_LEVELS)
-  
+
   # Remove all incomplete games
   incomplete_games = data %>%
     group_by(game_id, player_id) %>%
@@ -58,10 +58,10 @@ read_game_data = function(filename) {
     filter(rounds < NUM_ROUNDS) %>%
     select(game_id) %>%
     unique()
-  
+
   data = data %>%
     filter(!(game_id %in% incomplete_games$game_id))
-  
+
   # Remove any duplicate complete games that have the same SONA survey code
   # NB: this can happen if somebody played all the way through but exited before receiving credit
   # First, fetch sona survey codes with multiple complete games
@@ -71,7 +71,7 @@ read_game_data = function(filename) {
     summarize(trials = n()) %>%
     filter(trials > 300) %>%
     select(sona_survey_code)
-  
+
   # Next, get game id for the earlier complete game
   # NB: commented out code checks that we have slider/free resp data for at least one of the games
   duplicate_games = data %>%
@@ -85,10 +85,10 @@ read_game_data = function(filename) {
     # inner_join(fr_data, by = c("game_id", "player_id")) %>%
     # inner_join(slider_data, by = c("game_id", "player_id")) %>%
     distinct(game_id)
-  
+
   data = data %>%
     filter(!game_id %in% duplicate_games$game_id)
-  
+
   return(data)
 }
 
@@ -107,7 +107,7 @@ read_free_resp_data = function(filename, game_data) {
     mutate(strategy = STRATEGY_LOOKUP[[bot_strategy]],
            free_resp_answer = str_replace_all(free_resp_answer, "\n" , "[newline]")) %>%
     ungroup()
-  
+
   return(data)
 }
 
@@ -124,7 +124,7 @@ read_slider_data = function(filename, game_data) {
     group_by(bot_strategy, player_id, index) %>%
     mutate(strategy = STRATEGY_LOOKUP[[bot_strategy]]) %>%
     ungroup()
-  
+
   return(data)
 }
 
@@ -258,7 +258,7 @@ get_bot_prev2_outcome_loss_pct = function(data) {
     group_by(player_id) %>%
     mutate(prev_outcome = lag(player_outcome, 2)) %>%
     filter(is_bot == 1, # look only at bot prev moves
-           !is.na(prev_outcome)) %>% 
+           !is.na(prev_outcome)) %>%
     group_by(bot_strategy, game_id, player_id, prev_outcome) %>%
     count(player_outcome) %>%
     filter(!is.na(player_outcome)) %>% # TODO why do we have NA game outcomes??
@@ -370,7 +370,7 @@ default_plot_theme = theme(
   # backgrounds, lines
   panel.background = element_blank(),
   strip.background = element_blank(),
-  
+
   panel.grid = element_line(color = "gray"),
   axis.line = element_line(color = "black"),
   # positioning
@@ -396,14 +396,14 @@ plot_win_count_differential = function(win_diff, group, min, max, labelx, labely
                         end = 0.8) +
     scale_fill_viridis(discrete = T,
                        name = element_blank(),
-                       begin = 0.2, 
+                       begin = 0.2,
                        end = 0.8) +
     ggtitle(group) +
     default_plot_theme +
     theme(legend.position = "none")
 }
 
-# Histogram of null win count differential 
+# Histogram of null win count differential
 # NB: similar to above but with some formatting changes that make it easier to use a separate function
 plot_null_win_count_differential = function(win_diff, group, min, max) {
   win_diff %>%
@@ -416,7 +416,7 @@ plot_null_win_count_differential = function(win_diff, group, min, max) {
                         end = 0.8) +
     scale_fill_viridis(discrete = T,
                        name = element_blank(),
-                       begin = 0.2, 
+                       begin = 0.2,
                        end = 0.8) +
     ggtitle(group) +
     default_plot_theme +
@@ -433,7 +433,7 @@ plot_win_count_differential_summary = function(wcd_summary) {
                      "win_nil_lose_positive" = str_wrap(STRATEGY_LOOKUP[["win_nil_lose_positive"]], label_width),
                      "win_positive_lose_negative" = str_wrap(STRATEGY_LOOKUP[["win_positive_lose_negative"]], label_width),
                      "outcome_transition_dual_dependency" = str_wrap(STRATEGY_LOOKUP[["outcome_transition_dual_dependency"]], label_width))
-  
+
   wcd_summary %>%
     ggplot(aes(x = bot_strategy, y = mean_win_count_diff, color = bot_strategy)) +
     geom_point(size = 6) +
@@ -460,17 +460,17 @@ plot_win_count_differential_summary = function(wcd_summary) {
 # Plot average of each participant's win percent in blocks of trials by strategy
 plot_win_pct_by_block = function(block_data_summary) {
   label_width = 20
-  strategy_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width), 
+  strategy_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width),
                       "prev_move_negative" = str_wrap(STRATEGY_LOOKUP[["prev_move_negative"]], label_width),
                       "opponent_prev_move_nil" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_nil"]], label_width),
                       "opponent_prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_positive"]], label_width),
                       "win_nil_lose_positive" = str_wrap(STRATEGY_LOOKUP[["win_nil_lose_positive"]], label_width),
                       "win_positive_lose_negative" = str_wrap(STRATEGY_LOOKUP[["win_positive_lose_negative"]], label_width),
                       "outcome_transition_dual_dependency" = str_wrap(STRATEGY_LOOKUP[["outcome_transition_dual_dependency"]], label_width))
-  
+
   block_labels = c("1" = "30", "2" = "60", "3" = "90", "4" = "120", "5" = "150",
                    "6" = "180", "7" = "210", "8" = "240", "9" = "270", "10" = "300")
-  
+
   block_data_summary %>%
     ggplot(aes(x = round_block, y = mean_win_pct, color = bot_strategy)) +
     geom_point(size = 6, alpha = 0.75) +
@@ -548,7 +548,7 @@ plot_outcome_win_pct = function(bot_loss_summary_prev_outcome, strategy, xlabel)
 
 plot_slider_data = function(slider_data) {
   label_width = 10
-  strategy_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width), 
+  strategy_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width),
                       "prev_move_negative" = str_wrap(STRATEGY_LOOKUP[["prev_move_negative"]], label_width),
                       "opponent_prev_move_nil" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_nil"]], label_width),
                       "opponent_prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_positive"]], label_width),
@@ -597,7 +597,7 @@ fr_data = read_data(FREE_RESP_FILE)
 
 
 
-  
+
 
 
 # How many complete participants do we have for each bot strategy?
@@ -652,9 +652,9 @@ plot_win_count_differential_summary(wcd_summary)
 subject_block_data = get_subject_block_data(data, blocksize = 30)
 block_data_summary = get_block_data_summary(subject_block_data)
 # TODO why are we missing subject data for some intermittent blocks?
-# block_data_summary %>% 
-#   filter(bot_strategy == "opponent_prev_move_nil") %>% 
-#   select(subjects) %>% 
+# block_data_summary %>%
+#   filter(bot_strategy == "opponent_prev_move_nil") %>%
+#   select(subjects) %>%
 #   unique()
 
 plot_win_pct_by_block(block_data_summary)
@@ -670,7 +670,7 @@ CUTOFF = 200
 # 1. Bot previous move strategies
 bot_loss_prev_move = get_bot_prev_move_loss_pct(data, CUTOFF)
 bot_loss_summary_prev_move = get_prev_move_win_pct_summary(bot_loss_prev_move)
-  
+
 # Generate plots
 prev_move_positive_plot = plot_prev_move_win_pct(bot_loss_summary_prev_move, "prev_move_positive", "Bot previous move")
 prev_move_negative_plot = plot_prev_move_win_pct(bot_loss_summary_prev_move, "prev_move_negative", "Bot previous move")
@@ -708,7 +708,7 @@ prev_move_positive_plot + prev_move_negative_plot +
   win_nil_lose_positive_plot_outcome + win_positive_lose_negative_plot_outcome +
   # win_nil_lose_positive_plot_outcome_prev + win_positive_lose_negative_plot_outcome_prev +
   plot_layout(ncol = 2) +
-  plot_annotation(tag_levels = 'A') & 
+  plot_annotation(tag_levels = 'A') &
   theme(plot.tag = element_text(size = 24))
 
 # plot for slides
@@ -719,8 +719,8 @@ prev_move_positive_plot + opponent_prev_move_positive_plot + win_nil_lose_positi
 
 
 
-# strat = "win_nil_lose_positive"
-strat = "win_positive_lose_negative"
+strat = "win_nil_lose_positive"
+# strat = "win_positive_lose_negative"
 individ_data = bot_loss_prev_outcome %>%
   filter(bot_strategy == strat)
 
@@ -752,7 +752,7 @@ bot_loss_summary_prev_outcome %>%
         axis.text.x = element_text(angle = 0, vjust = 1))
 
 
-# 
+#
 # glimpse(individ_data)
 # losses = individ_data %>%
 #   filter(prev_outcome_coded == -1) %>%
@@ -769,14 +769,14 @@ bot_loss_summary_prev_outcome %>%
 #   ungroup() %>%
 #   select(player_win_pct) %>%
 #   rename("ties" = player_win_pct)
-# 
+#
 # mat = cbind(losses, wins, ties)
-# 
+#
 # cor(mat)
 
 
 MOVE_NAMES = c("rock", "paper", "scissors")
-TRANSITION_LOOKUP = matrix(c(c("0", "+", "-"), 
+TRANSITION_LOOKUP = matrix(c(c("0", "+", "-"),
                              c("-", "0", "+"),
                              c("+", "-", "0")),
                            byrow = TRUE,
@@ -796,7 +796,7 @@ transition_data = data %>%
 
 
 transition_summary = transition_data %>%
-  filter(is_bot == 0, 
+  filter(is_bot == 0,
          round_index > CUTOFF,
          bot_strategy == strat) %>%
   mutate(is_up = as.numeric(player_transition == "+"),
@@ -814,7 +814,7 @@ transition_summary = transition_data %>%
 
 
 win_pct_summary = data %>%
-  filter(is_bot == 0, 
+  filter(is_bot == 0,
          !is.na(player_outcome),
          round_index > CUTOFF) %>%
   group_by(bot_strategy, game_id, player_id) %>%
@@ -825,7 +825,7 @@ win_pct_summary = data %>%
 
 win_pct_summary = win_pct_summary %>%
   inner_join(transition_summary, by = c("player_id")) %>%
-  select(bot_strategy.x, game_id.x, player_id, rounds, wins, win_pct, 
+  select(bot_strategy.x, game_id.x, player_id, rounds, wins, win_pct,
          total, count_up, count_down, count_stay, pct_up, pct_down, pct_stay) %>%
   rename(
     "bot_strategy" = bot_strategy.x,
@@ -913,6 +913,32 @@ win_pct_summary %>%
   ggtitle(paste(STRATEGY_LOOKUP[[strat]], "last", NUM_ROUNDS - CUTOFF, "rounds", sep = " "))
 
 
+# Combine win rate and simulations on simplex
+win_pct_summary %>%
+  ggtern(aes(x = pct_up, y = pct_down, z = pct_stay)) +
+  geom_point(alpha = 0.75, size = 3, aes(color = win_pct)) +
+  geom_point(data = sample_summary, aes(x = pct_up, y = pct_down, z = pct_stay),
+             alpha = 0.25, color = "gray", size = 2) +
+  stat_density_tern(
+    data = sample_summary,
+    geom = 'polygon',
+    aes(fill = ..level..),
+    bins = 5,
+    color = "black",
+    fill = "gray",
+    alpha = 0.5) +
+  tern_limits(1.1, 1.1, 1.1) +
+  scale_color_viridis(name = "Win percent",
+                      begin = 1, end = 0) +
+  # labs(x = "Percent +", y = "Percent -", z = "Percent 0") +
+  labs(x = "Up (+)", y = "Down (-)", z = "Stay (0)") +
+  # ggtitle(paste(STRATEGY_LOOKUP[[strat]], "last", NUM_ROUNDS - CUTOFF, "rounds", sep = " "))
+  ggtitle("Transition percent (last 100 rounds)") +
+  default_plot_theme +
+  theme(axis.title = element_text(size = 13, face = "bold"),
+        axis.text = element_text(size = 14))
+
+
 
 # See if people who favored a particular transition break out by outcome-based win percentage
 TRANSITION_THRESHOLD = 0.6
@@ -957,9 +983,9 @@ bot_loss_summary_prev_outcome %>%
   scale_y_continuous(labels = seq(0, 1.0, by = 0.2),
                      breaks = seq(0, 1.0, by = 0.2),
                      limits = c(0, 1.0)) +
-  scale_color_discrete(name = "Transition rates", labels = c("high_positive" = "High shift up", 
-                                                             "high_negative" = "High shift down", 
-                                                             "high_stay" = "High stay", 
+  scale_color_discrete(name = "Transition rates", labels = c("high_positive" = "High shift up",
+                                                             "high_negative" = "High shift down",
+                                                             "high_stay" = "High stay",
                                                              "no_extreme" = "No extreme")) +
   labs(x = "Bot previous outcome", y = "Avg. player win pct") +
   ggtitle(STRATEGY_LOOKUP[[strat]]) +
@@ -988,11 +1014,11 @@ p2 = transition_data %>%
   filter(player_id == "46aa57c6-3450-4af3-b214-e3796206e88e")
 table(p2$player_transition)
 data %>%
-  filter(player_id == "46aa57c6-3450-4af3-b214-e3796206e88e", player_move == "none") 
+  filter(player_id == "46aa57c6-3450-4af3-b214-e3796206e88e", player_move == "none")
 data %>%
-  filter(player_id == "46aa57c6-3450-4af3-b214-e3796206e88e", is.na(player_move)) 
+  filter(player_id == "46aa57c6-3450-4af3-b214-e3796206e88e", is.na(player_move))
 p2 = data %>%
-  filter(player_id == "46aa57c6-3450-4af3-b214-e3796206e88e") 
+  filter(player_id == "46aa57c6-3450-4af3-b214-e3796206e88e")
 table(p2$player_move)
 
 data %>%
@@ -1027,17 +1053,17 @@ CUTOFF = 250 # {200, 225, 250, 275}
 STRAT = "win_positive_lose_negative"
 
 subj_win_pct = data %>%
-  filter(round_index > CUTOFF & 
+  filter(round_index > CUTOFF &
            !is.na(player_outcome)) %>% # TODO why the NA player outcomes...
   mutate(is_win = as.numeric(player_outcome == "win")) %>%
   group_by(bot_strategy, player_id) %>%
   summarize(total_rounds = n(),
             wins = sum(is_win),
             win_pct = wins / total_rounds)
-  
+
 # Looks pretty bi-modal (small cluster of people up around 0.75)
 subj_win_pct %>%
-  filter(bot_strategy == STRAT) %>% 
+  filter(bot_strategy == STRAT) %>%
   ggplot(aes(x = win_pct)) +
   geom_histogram(breaks = c(seq(0, 1.0, by = 0.05)),
                  alpha = 0.75, color = "blue", fill = "lightblue") +
@@ -1055,7 +1081,7 @@ winners = subj_win_pct %>%
   filter(binom_p < 0.05 & win_pct > 1/3)
 winners
 
-#' Summary: for cutoffs of 200, 225, 250, there is a small cluster of 5-6 people 
+#' Summary: for cutoffs of 200, 225, 250, there is a small cluster of 5-6 people
 #' with win percentages > 0.6; seems pretty clear these people "figured it out"
 #' Best view of this seems to be cutoff of 250 or 275
 #' For cutoff of 250, significance threshold is around .5, which is also what you get with repeating
@@ -1098,9 +1124,9 @@ move_summary %>%
 
 #' For almost any cutoff, some of these winners show a strong preference for one move, but not all of them.
 #' In fact, repeating one move gives you a guaranteed win percentage of 0.5 for every subsequent round,
-#' but many of these people have win percentages >> 0.5, suggesting they figured out more than just 
-#' the repeating move trick. This makes sense in that if you figure out the repeating thing, then 
-#' from there it's pretty easy to figure out how to beat the bot on "tie" rounds as well, which 
+#' but many of these people have win percentages >> 0.5, suggesting they figured out more than just
+#' the repeating move trick. This makes sense in that if you figure out the repeating thing, then
+#' from there it's pretty easy to figure out how to beat the bot on "tie" rounds as well, which
 #' could open the door to people recognizing the full sequence win strategy
 
 
@@ -1113,7 +1139,7 @@ subj_blocks = subject_block_data %>%
 # winners = subj_blocks %>%
 #   filter(round_block == 10 & win_pct >= 0.5) %>%
 #   distinct(player_id)
-# 
+#
 # subj_blocks = subj_blocks %>%
 #   filter(player_id %in% winners$player_id)
 
@@ -1127,7 +1153,7 @@ block_data_summary %>%
   geom_point(size = 6, alpha = 0.75) +
   geom_jitter(data = subj_blocks, aes(x = round_block, y = win_pct),
               color = "blue", alpha = 0.5, size = 2, width = 0.1) +
-  # geom_line(data = subj_blocks, aes(x = round_block, y = win_pct, color = player_id), 
+  # geom_line(data = subj_blocks, aes(x = round_block, y = win_pct, color = player_id),
   #             alpha = 0.5) +
   geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), size = 1, width = 0.25, alpha = 0.75) +
   geom_hline(yintercept = 1 / 3, linetype = "dashed", color = "red", size = 1) +
@@ -1177,7 +1203,7 @@ q5_plot = slider_summary %>%
 q1_plot + q2_plot + q3_plot + q4_plot + q5_plot +
   plot_layout(ncol = 2)
 
-  
+
 
 
 # ANALYSIS: Free Response =========================================================================

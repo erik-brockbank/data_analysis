@@ -1,7 +1,7 @@
-#' 
+#'
 #' RPS agent learning model
 #' Models process of learning bot strategies in order to capture human adaptive reasoning
-#' 
+#'
 
 
 #### SETUP ####
@@ -29,12 +29,46 @@ STRATEGY_LOOKUP = list("prev_move_positive" = "Previous move (+)",
                        "outcome_transition_dual_dependency" = "Outcome-transition dual dependency")
 
 
+# globals for vector-based EV calculations
+POINTS_TIE = 0
+POINTS_WIN = 3
+POINTS_LOSS = -1
+MOVE_CHOICES = c(0, 1, 2) # rock, paper, scissors
+MOVE_NAMES = c("rock", "paper", "scissors")
+MOVE_LOOKUP = c("0" = "rock", "1" = "paper", "2" = "scissors")
+
+BOT_NEXT_MOVE = matrix(rep(MOVE_CHOICES, 3),
+                       nrow = 3,
+                       dimnames = list(MOVE_CHOICES, MOVE_CHOICES))
+AGENT_NEXT_MOVE = matrix(rep(MOVE_CHOICES, each = 3),
+                         nrow = 3,
+                         dimnames = list(MOVE_CHOICES, MOVE_CHOICES))
+
+OUTCOME_MAT = (AGENT_NEXT_MOVE - BOT_NEXT_MOVE) %% 3 # rows = opponent move, cols = agent move
+OUTCOME_MAT[OUTCOME_MAT == 1] = POINTS_WIN
+OUTCOME_MAT[OUTCOME_MAT == 2] = POINTS_LOSS
+
+WIN_LOOKUP = OUTCOME_MAT # opponent's move in rows, player's move in cols
+WIN_LOOKUP[WIN_LOOKUP == POINTS_WIN] = 1
+WIN_LOOKUP[WIN_LOOKUP == POINTS_LOSS | WIN_LOOKUP == POINTS_TIE] = 0 # TODO there must be a better way to do this...
+rownames(WIN_LOOKUP) = MOVE_NAMES
+colnames(WIN_LOOKUP) = MOVE_NAMES
+
+TRANSITION_LOOKUP = matrix(c(c("0", "+", "-"),
+                             c("-", "0", "+"),
+                             c("+", "-", "0")),
+                           byrow = TRUE,
+                           nrow = 3,
+                           dimnames = list(MOVE_NAMES, MOVE_NAMES))
+
+
+
 #### DATA PROCESSING FUNCTIONS ####
 
 read_bot_data = function(filename, strategies, game_rounds) {
   data = read_csv(filename)
   data$bot_strategy = factor(data$bot_strategy, levels = strategies)
-  
+
   # Remove all incomplete games
   incomplete_games = data %>%
     group_by(game_id, player_id) %>%
@@ -42,10 +76,10 @@ read_bot_data = function(filename, strategies, game_rounds) {
     filter(rounds < game_rounds) %>%
     select(game_id) %>%
     unique()
-  
+
   data = data %>%
     filter(!(game_id %in% incomplete_games$game_id))
-  
+
   # Remove any duplicate complete games that have the same SONA survey code
   # NB: this can happen if somebody played all the way through but exited before receiving credit
   # First, fetch sona survey codes with multiple complete games
@@ -55,7 +89,7 @@ read_bot_data = function(filename, strategies, game_rounds) {
     summarize(trials = n()) %>%
     filter(trials > 300) %>%
     select(sona_survey_code)
-  
+
   # Next, get game id for the earlier complete game
   # NB: commented out code checks that we have slider/free resp data for at least one of the games
   duplicate_games = data %>%
@@ -69,10 +103,10 @@ read_bot_data = function(filename, strategies, game_rounds) {
     # inner_join(fr_data, by = c("game_id", "player_id")) %>%
     # inner_join(slider_data, by = c("game_id", "player_id")) %>%
     distinct(game_id)
-  
+
   data = data %>%
     filter(!game_id %in% duplicate_games$game_id)
-  
+
   return(data)
 }
 
@@ -134,7 +168,7 @@ add_transition_counts = function(data, prior_count) {
                                             prior_count, # set count to prior on first move
                                             bot_transition_prev_move == "0"))
            )
-  
+
 }
 
 # Add counts of each bot's transitions each round relative to its opponent's previous move
@@ -163,47 +197,47 @@ add_outcome_transition_counts = function(data, prior_count) {
     # TODO this is hacky but works...
     mutate(c_win_up = cumsum(ifelse(is.na(bot_prev_outcome),
                                     prior_count, # set count to prior on first move
-                                    (bot_prev_outcome == "win" & 
+                                    (bot_prev_outcome == "win" &
                                        bot_transition_prev_move == "+"))),
            c_win_down = cumsum(ifelse(is.na(bot_prev_outcome),
                                       prior_count, # set count to prior on first move
-                                      (bot_prev_outcome == "win" & 
+                                      (bot_prev_outcome == "win" &
                                          bot_transition_prev_move == "-"))),
            c_win_stay = cumsum(ifelse(is.na(bot_prev_outcome),
                                       prior_count, # set count to prior on first move
-                                      (bot_prev_outcome == "win" & 
+                                      (bot_prev_outcome == "win" &
                                          bot_transition_prev_move == "0"))),
            c_lose_up = cumsum(ifelse(is.na(bot_prev_outcome),
                                      prior_count, # set count to prior on first move
-                                     (bot_prev_outcome == "loss" & 
+                                     (bot_prev_outcome == "loss" &
                                         bot_transition_prev_move == "+"))),
            c_lose_down = cumsum(ifelse(is.na(bot_prev_outcome),
                                        prior_count, # set count to prior on first move
-                                       (bot_prev_outcome == "loss" & 
+                                       (bot_prev_outcome == "loss" &
                                           bot_transition_prev_move == "-"))),
            c_lose_stay = cumsum(ifelse(is.na(bot_prev_outcome),
                                        prior_count, # set count to prior on first move
-                                       (bot_prev_outcome == "loss" & 
+                                       (bot_prev_outcome == "loss" &
                                           bot_transition_prev_move == "0"))),
            c_tie_up = cumsum(ifelse(is.na(bot_prev_outcome),
                                     prior_count, # set count to prior on first move
-                                    (bot_prev_outcome == "tie" & 
+                                    (bot_prev_outcome == "tie" &
                                        bot_transition_prev_move == "+"))),
            c_tie_down = cumsum(ifelse(is.na(bot_prev_outcome),
                                       prior_count, # set count to prior on first move
-                                      (bot_prev_outcome == "tie" & 
+                                      (bot_prev_outcome == "tie" &
                                          bot_transition_prev_move == "-"))),
            c_tie_stay = cumsum(ifelse(is.na(bot_prev_outcome),
                                       prior_count, # set count to prior on first move
-                                      (bot_prev_outcome == "tie" & 
+                                      (bot_prev_outcome == "tie" &
                                          bot_transition_prev_move == "0")))
     )
-    
+
 }
 
 
 
-# Calculate normalized probabilities of bot making each transition each round based on counts 
+# Calculate normalized probabilities of bot making each transition each round based on counts
 # determined in functions above
 calculate_probabilities_from_counts = function(data) {
   data %>%
@@ -230,121 +264,6 @@ calculate_probabilities_from_counts = function(data) {
     )
 }
 
-# # Add expected value for agent of each move based on bot transition probabilities (relative to bot's own previous move)
-# # NB: this takes about 30s+ (case eval. seems slow...)
-# # TODO: replace POINTS_TIE below with something like points_lookup[outcome_lookup["rock", move_lookup[bot_prev_move, "0"]]]
-# calculate_ev_transitions = function(data) {
-#   data %>%
-#     group_by(bot_strategy, player_id, round_index) %>%
-#     mutate(
-#       # EV for the agent choosing rock based on bot's transition probabilities (relative to its own prev move)
-#       ev_rock_prev_move = case_when(is.na(bot_prev_move) ~ 
-#                                       (((1 / 3) * POINTS_TIE) + ((1 / 3) * POINTS_LOSS) + ((1 / 3) * POINTS_WIN)),
-#                                     bot_prev_move == "rock" ~ 
-#                                       # bot's previous move was rock: probability of each bot transition from rock times points agent gets for playing rock against that transition
-#                                       ((p_prev_move_stay * POINTS_TIE) + (p_prev_move_up * POINTS_LOSS) + (p_prev_move_down * POINTS_WIN)),
-#                                     bot_prev_move == "paper" ~ 
-#                                       # bot's previous move was paper: probability of each bot transition from paper times points agent gets for playing rock against that transition
-#                                       ((p_prev_move_stay * POINTS_LOSS) + (p_prev_move_up * POINTS_WIN) + (p_prev_move_down * POINTS_TIE)),
-#                                     bot_prev_move == "scissors" ~ 
-#                                       # bot's previous move was scissors: probability of each bot transition from scissors times points agent gets for playing rock against that transition
-#                                       ((p_prev_move_stay * POINTS_WIN) + (p_prev_move_up * POINTS_TIE) + (p_prev_move_down * POINTS_LOSS))),
-#       ev_paper_prev_move = case_when(is.na(bot_prev_move) ~ 
-#                                        (((1 / 3) * POINTS_TIE) + ((1 / 3) * POINTS_LOSS) + ((1 / 3) * POINTS_WIN)),
-#                                      bot_prev_move == "rock" ~ 
-#                                        # bot's previous move was rock: probability of each bot transition from rock times points agent gets for playing paper against that transition
-#                                        ((p_prev_move_stay * POINTS_WIN) + (p_prev_move_up * POINTS_TIE) + (p_prev_move_down * POINTS_LOSS)),
-#                                      bot_prev_move == "paper" ~ 
-#                                        ((p_prev_move_stay * POINTS_TIE) + (p_prev_move_up * POINTS_LOSS) + (p_prev_move_down * POINTS_WIN)),
-#                                      bot_prev_move == "scissors" ~ 
-#                                        ((p_prev_move_stay * POINTS_LOSS) + (p_prev_move_up * POINTS_WIN) + (p_prev_move_down * POINTS_TIE))),
-#       ev_scissors_prev_move = case_when(is.na(bot_prev_move) ~ 
-#                                           (((1 / 3) * POINTS_TIE) + ((1 / 3) * POINTS_LOSS) + ((1 / 3) * POINTS_WIN)),
-#                                         bot_prev_move == "rock" ~ 
-#                                           ((p_prev_move_stay * POINTS_LOSS) + (p_prev_move_up * POINTS_WIN) + (p_prev_move_down * POINTS_TIE)),
-#                                         bot_prev_move == "paper" ~ 
-#                                           ((p_prev_move_stay * POINTS_WIN) + (p_prev_move_up * POINTS_TIE) + (p_prev_move_down * POINTS_LOSS)),
-#                                         bot_prev_move == "scissors" ~ 
-#                                           ((p_prev_move_stay * POINTS_TIE) + (p_prev_move_up * POINTS_LOSS) + (p_prev_move_down * POINTS_WIN)))
-#     )
-# }
-
-# Add expected value for agent of each move based on bot transition probabilities (relative to bot's *opponent's* previous move)
-# NB: this takes about 30s+ (case eval. seems slow...)
-# TODO: replace POINTS_TIE below with something like points_lookup[outcome_lookup["rock", move_lookup[bot_prev_move, "0"]]]
-# calculate_ev_opponent_transitions = function(data) {data %>%
-#     group_by(bot_strategy, player_id, round_index) %>%
-#     mutate(
-#       # EV for the agent choosing rock based on bot's transition probabilities (relative to its opponent's prev move)
-#       ev_rock_opponent_prev_move = case_when((is.na(opponent_prev_move) | opponent_prev_move == "none") ~ 
-#                                                as.numeric((((1 / 3) * POINTS_TIE) + ((1 / 3) * POINTS_LOSS) + ((1 / 3) * POINTS_WIN))),
-#                                              opponent_prev_move == "rock" ~ 
-#                                                # bot's opponent's previous move was rock: probability of each bot transition (from opponent rock) times points agent gets for playing rock against that transition
-#                                                ((p_opponent_prev_move_stay * POINTS_TIE) + (p_opponent_prev_move_up * POINTS_LOSS) + (p_opponent_prev_move_down * POINTS_WIN)),
-#                                              opponent_prev_move == "paper" ~ 
-#                                                # bot's opponent's previous move was paper: probability of each bot transition (from opponent paper) times points agent gets for playing rock against that transition
-#                                                ((p_opponent_prev_move_stay * POINTS_LOSS) + (p_opponent_prev_move_up * POINTS_WIN) + (p_opponent_prev_move_down * POINTS_TIE)),
-#                                              opponent_prev_move == "scissors" ~ 
-#                                                # bot's opponent's previous move was scissors: probability of each bot transition (from opponent scissors) times points agent gets for playing rock against that transition
-#                                                ((p_opponent_prev_move_stay * POINTS_WIN) + (p_opponent_prev_move_up * POINTS_TIE) + (p_opponent_prev_move_down * POINTS_LOSS))),
-#       ev_paper_opponent_prev_move = case_when((is.na(opponent_prev_move) | opponent_prev_move == "none") ~ 
-#                                                 (((1 / 3) * POINTS_TIE) + ((1 / 3) * POINTS_LOSS) + ((1 / 3) * POINTS_WIN)),
-#                                               opponent_prev_move == "rock" ~ 
-#                                                 # bot's opponent's previous move was rock: probability of each bot transition (from opponent rock) times points agent gets for playing scissors against that transition
-#                                                 ((p_opponent_prev_move_stay * POINTS_WIN) + (p_opponent_prev_move_up * POINTS_TIE) + (p_opponent_prev_move_down * POINTS_LOSS)),
-#                                               opponent_prev_move == "paper" ~ 
-#                                                 ((p_opponent_prev_move_stay * POINTS_TIE) + (p_opponent_prev_move_up * POINTS_LOSS) + (p_opponent_prev_move_down * POINTS_WIN)),
-#                                               opponent_prev_move == "scissors" ~ 
-#                                                 ((p_opponent_prev_move_stay * POINTS_LOSS) + (p_opponent_prev_move_up * POINTS_WIN) + (p_opponent_prev_move_down * POINTS_TIE))),
-#       ev_scissors_opponent_prev_move = case_when((is.na(opponent_prev_move) | opponent_prev_move == "none") ~ 
-#                                                    (((1 / 3) * POINTS_TIE) + ((1 / 3) * POINTS_LOSS) + ((1 / 3) * POINTS_WIN)),
-#                                                  opponent_prev_move == "rock" ~ 
-#                                                    ((p_opponent_prev_move_stay * POINTS_LOSS) + (p_opponent_prev_move_up * POINTS_WIN) + (p_opponent_prev_move_down * POINTS_TIE)),
-#                                                  opponent_prev_move == "paper" ~ 
-#                                                    ((p_opponent_prev_move_stay * POINTS_WIN) + (p_opponent_prev_move_up * POINTS_TIE) + (p_opponent_prev_move_down * POINTS_LOSS)),
-#                                                  opponent_prev_move == "scissors" ~ 
-#                                                    ((p_opponent_prev_move_stay * POINTS_TIE) + (p_opponent_prev_move_up * POINTS_LOSS) + (p_opponent_prev_move_down * POINTS_WIN)))
-#     )
-# }
-
-
-
-
-# globals for vector-based EV calculations
-POINTS_TIE = 0 # TODO put these somewhere useful... maybe pass them into the functions as well, or replace with a lookup
-POINTS_WIN = 3
-POINTS_LOSS = -1
-
-MOVE_CHOICES = c(0, 1, 2) # rock, paper, scissors
-MOVE_NAMES = c("rock", "paper", "scissors")
-MOVE_LOOKUP = c("0" = "rock", "1" = "paper", "2" = "scissors")
-
-BOT_NEXT_MOVE = matrix(rep(MOVE_CHOICES, 3), 
-                       nrow = 3,
-                       dimnames = list(MOVE_CHOICES, MOVE_CHOICES))
-AGENT_NEXT_MOVE = matrix(rep(MOVE_CHOICES, each = 3), 
-                         nrow = 3,
-                         dimnames = list(MOVE_CHOICES, MOVE_CHOICES))
-
-OUTCOME_MAT = (AGENT_NEXT_MOVE - BOT_NEXT_MOVE) %% 3 # rows = opponent move, cols = agent move
-OUTCOME_MAT[OUTCOME_MAT == 1] = POINTS_WIN
-OUTCOME_MAT[OUTCOME_MAT == 2] = POINTS_LOSS
-
-WIN_LOOKUP = OUTCOME_MAT # opponent's move in rows, player's move in cols
-WIN_LOOKUP[WIN_LOOKUP == POINTS_WIN] = 1
-WIN_LOOKUP[WIN_LOOKUP == POINTS_LOSS | WIN_LOOKUP == POINTS_TIE] = 0 # TODO there must be a better way to do this...
-rownames(WIN_LOOKUP) = MOVE_NAMES
-colnames(WIN_LOOKUP) = MOVE_NAMES
-
-
-TRANSITION_LOOKUP = matrix(c(c("0", "+", "-"), 
-                             c("-", "0", "+"),
-                             c("+", "-", "0")),
-                           byrow = TRUE,
-                           nrow = 3,
-                           dimnames = list(MOVE_NAMES, MOVE_NAMES))
-
-
 
 softmax = function(vals, k) {
   x = 0:(length(vals) - 1)
@@ -359,11 +278,11 @@ calculate_ev_vec = function(transition_probs, prev_move) {
   # TODO should be possible not to have to declare this every time
   transition_mat = matrix(c(transition_probs[3], transition_probs[1], transition_probs[2], # row = previous move, col = next move
                             transition_probs[2], transition_probs[3], transition_probs[1],
-                            transition_probs[1], transition_probs[2], transition_probs[3]), 
+                            transition_probs[1], transition_probs[2], transition_probs[3]),
                           byrow = T,
                           nrow = 3,
                           dimnames = list(MOVE_CHOICES, MOVE_CHOICES))
-  
+
   prev_move = as.character(which(MOVE_NAMES == prev_move) - 1) # this can be 0, 1, or 2 (as string) and can be bot prev move or bot opponent prev move
   p_bot_next_move = matrix(rep(transition_mat[prev_move,], 3), # rows are bot next move probabilities, columns are agent moves
                            nrow = 3)
@@ -387,11 +306,11 @@ calculate_ev_vals = function(data) {
                                          list(c(2 / 3, 2 / 3, 2 / 3)),
                                          # TODO can we get rid of case_when here? ...
                                          case_when(
-                                           bot_prev_outcome == "win" ~ 
+                                           bot_prev_outcome == "win" ~
                                              list(calculate_ev_vec(c(p_win_up, p_win_down, p_win_stay), bot_prev_move)),
-                                           bot_prev_outcome == "loss" ~ 
+                                           bot_prev_outcome == "loss" ~
                                              list(calculate_ev_vec(c(p_lose_up, p_lose_down, p_lose_stay), bot_prev_move)),
-                                           bot_prev_outcome == "tie" ~ 
+                                           bot_prev_outcome == "tie" ~
                                              list(calculate_ev_vec(c(p_tie_up, p_tie_down, p_tie_stay), bot_prev_move)))
                                          ),
            ev_vals_total = list(ev_vals_prev_move[[1]] + ev_vals_opponent_prev_move[[1]] + ev_vals_prev_outcome[[1]])
@@ -412,76 +331,6 @@ choose_agent_move = function(data) {
 }
 
 
-
-
-
-
-
-
-# # Function to aggregate EV calculations across all bot strategies for each move
-# calculate_total_evs = function(data) {
-#   data %>%
-#     group_by(bot_strategy, player_id, round_index) %>%
-#     mutate(ev_rock_total = sum(ev_rock_prev_move, ev_rock_opponent_prev_move),
-#            ev_paper_total = sum(ev_paper_prev_move, ev_paper_opponent_prev_move),
-#            ev_scissors_total = sum(ev_scissors_prev_move, ev_scissors_opponent_prev_move))
-# }
-
-# # Function to choose move based on max. EV across all strategies
-# choose_max_ev_move_all_transitions = function(data) {
-#   data %>%
-#     group_by(bot_strategy, player_id, round_index) %>%
-#     mutate(agent_move = case_when((ev_rock_total == ev_paper_total & ev_paper_total == ev_scissors_total) ~ 
-#                                     # when all EVs are equal, choose randomly
-#                                     sample(c("rock", "paper", "scissors"), size = 1, prob = c(1/3, 1/3, 1/3)),
-#                                   max(ev_rock_total, ev_paper_total, ev_scissors_total) == ev_rock_total ~ "rock",
-#                                   max(ev_rock_total, ev_paper_total, ev_scissors_total) == ev_paper_total ~ "paper",
-#                                   max(ev_rock_total, ev_paper_total, ev_scissors_total) == ev_scissors_total ~ "scissors")
-#     )
-# }
-
-# # Function to choose move based on EV across only bot previous move transition strategies
-# choose_max_ev_move_self_transitions = function(data) {
-#   data %>%
-#     group_by(bot_strategy, player_id, round_index) %>%
-#     mutate(agent_move = case_when((ev_rock_prev_move == ev_paper_prev_move & ev_paper_prev_move == ev_scissors_prev_move) ~ 
-#                                     # when all EVs are equal, choose randomly
-#                                     sample(c("rock", "paper", "scissors"), size = 1, prob = c(1/3, 1/3, 1/3)),
-#                                   max(ev_rock_prev_move, ev_paper_prev_move, ev_scissors_prev_move) == ev_rock_prev_move ~ "rock",
-#                                   max(ev_rock_prev_move, ev_paper_prev_move, ev_scissors_prev_move) == ev_paper_prev_move ~ "paper",
-#                                   max(ev_rock_prev_move, ev_paper_prev_move, ev_scissors_prev_move) == ev_scissors_prev_move ~ "scissors")
-#     )
-#   
-# }
-
-# Function to choose move based on EV across only opponent previous move transition strategies
-# choose_max_ev_move_opponent_transitions = function(data) {
-#   data %>%
-#     group_by(bot_strategy, player_id, round_index) %>%
-#     mutate(agent_move = case_when((ev_rock_opponent_prev_move == ev_paper_opponent_prev_move & ev_paper_opponent_prev_move == ev_scissors_opponent_prev_move) ~ 
-#                                     # when all EVs are equal, choose randomly
-#                                     sample(c("rock", "paper", "scissors"), size = 1, prob = c(1/3, 1/3, 1/3)),
-#                                   max(ev_rock_opponent_prev_move, ev_paper_opponent_prev_move, ev_scissors_opponent_prev_move) == ev_rock_opponent_prev_move ~ "rock",
-#                                   max(ev_rock_opponent_prev_move, ev_paper_opponent_prev_move, ev_scissors_opponent_prev_move) == ev_paper_opponent_prev_move ~ "paper",
-#                                   max(ev_rock_opponent_prev_move, ev_paper_opponent_prev_move, ev_scissors_opponent_prev_move) == ev_scissors_opponent_prev_move ~ "scissors")
-#     )
-#   
-# }
-
-# # Function to determine agent's result from choosing max EV move against each bot
-# get_agent_outcomes = function(data) {
-#   data %>%
-#     group_by(bot_strategy, player_id, round_index) %>%
-#     mutate(agent_outcome = case_when(agent_move == player_move ~ "tie",
-#                                      ((agent_move == "rock" & player_move == "paper") |
-#                                         (agent_move == "paper" & player_move == "scissors") |
-#                                         (agent_move == "scissors" & player_move == "rock")) ~ "loss",
-#                                      ((agent_move == "rock" & player_move == "scissors") |
-#                                         (agent_move == "paper" & player_move == "rock") |
-#                                         (agent_move == "scissors" & player_move == "paper")) ~ "win"))
-# }
-
-
 #### GRAPHING FUNCTIONS ####
 
 individ_plot_theme = theme(
@@ -500,7 +349,7 @@ individ_plot_theme = theme(
   # backgrounds, lines
   panel.background = element_blank(),
   strip.background = element_blank(),
-  
+
   panel.grid = element_line(color = "gray"),
   axis.line = element_line(color = "black"),
   # positioning
@@ -511,17 +360,17 @@ individ_plot_theme = theme(
 # Plot average of each participant's win percent in blocks of trials by strategy
 plot_bot_strategy_win_pct_by_block = function(block_data_summary, title, legend_pos) {
   label_width = 20
-  strategy_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width), 
+  strategy_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width),
                       "prev_move_negative" = str_wrap(STRATEGY_LOOKUP[["prev_move_negative"]], label_width),
                       "opponent_prev_move_nil" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_nil"]], label_width),
                       "opponent_prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_positive"]], label_width),
                       "win_nil_lose_positive" = str_wrap(STRATEGY_LOOKUP[["win_nil_lose_positive"]], label_width),
                       "win_positive_lose_negative" = str_wrap(STRATEGY_LOOKUP[["win_positive_lose_negative"]], label_width),
                       "outcome_transition_dual_dependency" = str_wrap(STRATEGY_LOOKUP[["outcome_transition_dual_dependency"]], label_width))
-  
+
   block_labels = c("1" = "30", "2" = "60", "3" = "90", "4" = "120", "5" = "150",
                    "6" = "180", "7" = "210", "8" = "240", "9" = "270", "10" = "300")
-  
+
   block_data_summary %>%
     ggplot(aes(x = round_block, y = mean_win_pct, color = bot_strategy)) +
     geom_point(size = 6, alpha = 0.75) +
@@ -533,14 +382,14 @@ plot_bot_strategy_win_pct_by_block = function(block_data_summary, title, legend_
                         name = element_blank(),
                         labels = strategy_labels) +
     scale_x_continuous(labels = block_labels, breaks = seq(1:10)) +
-    scale_y_continuous(breaks = seq(0.25, 0.85, by = 0.1), 
+    scale_y_continuous(breaks = seq(0.25, 0.85, by = 0.1),
                        labels = seq(0.25, 0.85, by = 0.1),
                        limits = c(0.25, 0.85)) +
     individ_plot_theme +
     theme(
       legend.text = element_text(face = "bold", size = 14),
       legend.position = legend_pos,
-      legend.spacing.y = unit(5.0, 'cm'),
+      legend.spacing.y = unit(2.0, 'cm'),
       legend.key.size = unit(4, 'lines'))
 }
 
@@ -592,53 +441,11 @@ glimpse(bot_results)
 # We want to try and capture these empirical learning curves with our learning agents
 subject_block_data = get_subject_block_data(bot_data, blocksize = 30)
 block_data_summary = get_block_data_summary(subject_block_data)
-human_perf = plot_bot_strategy_win_pct_by_block(block_data_summary, "Participants", "none")
+human_perf = plot_bot_strategy_win_pct_by_block(block_data_summary, "Participants\n", "left")
 human_perf
 
 
-
-#### Bot Strategy Agent Learning Curves ####
-
-# # Add bot counts of each transition relative to previous move, opponent previous move
-# bot_results = add_transition_counts(bot_results, 1)
-# bot_results = add_opponent_transition_counts(bot_results, 1)
-# glimpse(bot_results)
-# 
-# # Compute probabilities of bot making each transition relative to previous move, opponent previous move
-# # TODO add exponential decay to probability calculations
-# bot_results = calculate_probabilities_from_counts(bot_results)
-# glimpse(bot_results)
-# 
-# # Get expected value of each next move according to probabilities dictated by bot's transition probabilities
-# bot_results = calculate_ev_transitions(bot_results) # NB: this can take 30-45s
-# bot_results = calculate_ev_opponent_transitions(bot_results) # NB: this can take 30-45s
-# glimpse(bot_results)
-# 
-# # Choose max expected value move across all predictive models (currently just transitions)
-#   # and calculate outcome for agent making this choice
-# bot_results = calculate_total_evs(bot_results)
-# bot_results_all = choose_max_ev_move_all_transitions(bot_results) # NB: this can take ~30s
-# bot_results_prev_move = choose_max_ev_move_self_transitions(bot_results) # NB: this can take ~15-20s
-# bot_results_opponent_prev_move = choose_max_ev_move_opponent_transitions(bot_results) # NB: this can take ~15-20s
-# 
-# glimpse(bot_results_all)
-# # sanity check
-# table(bot_results_all$agent_move)
-# 
-# # Compute outcomes for agent moves based on max expected value choices above
-# bot_results_all = get_agent_outcomes(bot_results_all) # NB: this can take ~15-20s
-# bot_results_prev_move = get_agent_outcomes(bot_results_prev_move) # NB: this can take ~15-20s
-# bot_results_opponent_prev_move = get_agent_outcomes(bot_results_opponent_prev_move) # NB: this can take ~15-20s
-# 
-# glimpse(bot_results_all)
-
-
-
-
-
-
-
-#### Vector analysis ####
+#### Bot Strategy Adaptive Agent Learning Curves ####
 # Add bot counts of each transition relative to previous move, opponent previous move
 TRANSITION_PRIOR = 25
 bot_results = add_transition_counts(bot_results, TRANSITION_PRIOR)
@@ -674,9 +481,9 @@ BLOCKSIZE = 30
 bot_results_agent_block_summary = bot_results_new %>%
   group_by(bot_strategy, round_index) %>%
   mutate(round_block = ceiling(round_index / BLOCKSIZE)) %>%
-  select(bot_strategy, round_index, game_id, player_id, 
+  select(bot_strategy, round_index, game_id, player_id,
          agent_prev_move_win, agent_opponent_prev_move_win, agent_combined_prev_moves_win,
-         agent_prev_outcome_win, agent_combined_win, 
+         agent_prev_outcome_win, agent_combined_win,
          round_block) %>%
   group_by(bot_strategy, game_id, player_id, round_block) %>%
   summarize(total_rounds = n(),
@@ -728,7 +535,7 @@ bot_results_block_summary = bot_results_agent_block_summary %>%
 # Plot results
 
 label_width = 20
-strategy_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width), 
+strategy_labels = c("prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["prev_move_positive"]], label_width),
                     "prev_move_negative" = str_wrap(STRATEGY_LOOKUP[["prev_move_negative"]], label_width),
                     "opponent_prev_move_nil" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_nil"]], label_width),
                     "opponent_prev_move_positive" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move_positive"]], label_width),
@@ -757,7 +564,7 @@ prev_move_plot = bot_results_block_summary %>%
   individ_plot_theme +
   theme(
     legend.text = element_text(face = "bold", size = 14),
-    legend.position = "right",
+    legend.position = "none",
     legend.spacing.y = unit(5.0, 'cm'),
     legend.key.size = unit(4, 'lines'))
 
@@ -789,8 +596,9 @@ combined_prev_moves_plot = bot_results_block_summary %>%
   geom_point(size = 6, alpha = 0.75) +
   geom_errorbar(aes(ymin = lower_ci_combined_prev_moves, ymax = upper_ci_combined_prev_moves), size = 1, width = 0.25, alpha = 0.75) +
   geom_hline(yintercept = 1 / 3, linetype = "dashed", color = "red", size = 1) +
-  labs(x = "Game round", y = "Mean win percentage") +
-  ggtitle("All prev. moves transition agent") +
+  # labs(x = "Game round", y = "Mean win percentage") +
+  labs(x = "Game round", y = "") +
+  ggtitle("Learning agent \nH = {previous moves}") +
   scale_color_viridis(discrete = T,
                       name = element_blank(),
                       labels = strategy_labels) +
@@ -801,7 +609,7 @@ combined_prev_moves_plot = bot_results_block_summary %>%
   individ_plot_theme +
   theme(
     legend.text = element_text(face = "bold", size = 14),
-    legend.position = "right",
+    legend.position = "none",
     legend.spacing.y = unit(5.0, 'cm'),
     legend.key.size = unit(4, 'lines'))
 
@@ -811,8 +619,9 @@ prev_outcome_plot = bot_results_block_summary %>%
   geom_point(size = 6, alpha = 0.75) +
   geom_errorbar(aes(ymin = lower_ci_prev_outcome, ymax = upper_ci_prev_outcome), size = 1, width = 0.25, alpha = 0.75) +
   geom_hline(yintercept = 1 / 3, linetype = "dashed", color = "red", size = 1) +
-  labs(x = "Game round", y = "Mean win percentage") +
-  ggtitle("Prev. outcome transition agent") +
+  # labs(x = "Game round", y = "Mean win percentage") +
+  labs(x = "Game round", y = "") +
+  ggtitle("Learning agent \nH = {previous outcomes}") +
   scale_color_viridis(discrete = T,
                       name = element_blank(),
                       labels = strategy_labels) +
@@ -823,7 +632,7 @@ prev_outcome_plot = bot_results_block_summary %>%
   individ_plot_theme +
   theme(
     legend.text = element_text(face = "bold", size = 14),
-    legend.position = "right",
+    legend.position = "none",
     legend.spacing.y = unit(5.0, 'cm'),
     legend.key.size = unit(4, 'lines'))
 
@@ -833,8 +642,8 @@ combined_agent_plot = bot_results_block_summary %>%
   geom_point(size = 6, alpha = 0.75) +
   geom_errorbar(aes(ymin = lower_ci_combined, ymax = upper_ci_combined), size = 1, width = 0.25, alpha = 0.75) +
   geom_hline(yintercept = 1 / 3, linetype = "dashed", color = "red", size = 1) +
-  labs(x = "Game round", y = "Mean win percentage") +
-  ggtitle("Combined transition agent") +
+  labs(x = "Game round", y = "") +
+  ggtitle("Learning agent \nH = {previous moves, previous outcomes}") +
   scale_color_viridis(discrete = T,
                       name = element_blank(),
                       labels = strategy_labels) +
@@ -845,7 +654,7 @@ combined_agent_plot = bot_results_block_summary %>%
   individ_plot_theme +
   theme(
     legend.text = element_text(face = "bold", size = 14),
-    legend.position = "right",
+    legend.position = "none",
     legend.spacing.y = unit(5.0, 'cm'),
     legend.key.size = unit(4, 'lines'))
 
@@ -856,42 +665,15 @@ human_perf + combined_prev_moves_plot
 human_perf + prev_outcome_plot
 human_perf + combined_agent_plot
 
+# Presentation graph
+human_perf + combined_agent_plot +
+  combined_prev_moves_plot + prev_outcome_plot +
+  plot_layout(ncol = 4)
 
+human_perf +
+  combined_prev_moves_plot + prev_outcome_plot
 
-
-
-
-
-
-# # Make identical plot as above but based on agent outcomes rather than player outcomes
-# agent_block_data_all = get_agent_block_data(bot_results_all, blocksize = 30)
-# agent_block_data_summary_all = get_block_data_summary(agent_block_data_all)
-# agent_perf_all = plot_bot_strategy_win_pct_by_block(agent_block_data_summary_all, "Agent win percentage", "right")
-# agent_perf_all
-
-# Plot human and agent performance alongside each other with patchwork
-# human_perf + agent_perf_all
-
-
-# # Make identical plot as above but based on agent outcomes rather than player outcomes
-# agent_block_data_prev_move = get_agent_block_data(bot_results_prev_move, blocksize = 30)
-# agent_block_data_summary_prev_move = get_block_data_summary(agent_block_data_prev_move)
-# agent_perf_prev_move = plot_bot_strategy_win_pct_by_block(agent_block_data_summary_prev_move, "Agent win percentage: prev move", "right")
-# agent_perf_prev_move
-
-# Plot human and agent performance alongside each other with patchwork
-# human_perf + agent_perf_prev_move
-
-
-# # Make identical plot as above but based on agent outcomes rather than player outcomes
-# agent_block_data_opponent_prev_move = get_agent_block_data(bot_results_opponent_prev_move, blocksize = 30)
-# agent_block_data_summary_opponent_prev_move = get_block_data_summary(agent_block_data_opponent_prev_move)
-# agent_perf_opponent_prev_move = plot_bot_strategy_win_pct_by_block(agent_block_data_summary_opponent_prev_move, "Agent win percentage: opp. prev move", "right")
-# agent_perf_opponent_prev_move
-
-# Plot human and agent performance alongside each other with patchwork
-# human_perf + agent_perf_opponent_prev_move
-
+human_perf + combined_agent_plot
 
 
 
@@ -906,14 +688,14 @@ glimpse(bot_results_opponent_prev_move)
 
 bot_results_combined = bot_results_all %>%
   inner_join(bot_results_prev_move, by = c("game_id", "player_id", "round_index", "bot_strategy")) %>%
-  select(game_id, player_id, round_index, bot_strategy, 
-         player_move.x, player_outcome.x, opponent_move.x, 
+  select(game_id, player_id, round_index, bot_strategy,
+         player_move.x, player_outcome.x, opponent_move.x,
          bot_prev_move.x, opponent_prev_move.x,
          agent_move.x, agent_outcome.x,
          agent_move.y, agent_outcome.y) %>%
   inner_join(bot_results_opponent_prev_move, by = c("game_id", "player_id", "round_index", "bot_strategy")) %>%
-  select(game_id, player_id, round_index, bot_strategy, 
-         player_move, player_outcome, opponent_move, bot_prev_move, opponent_prev_move, 
+  select(game_id, player_id, round_index, bot_strategy,
+         player_move, player_outcome, opponent_move, bot_prev_move, opponent_prev_move,
          agent_move.x, agent_outcome.x, agent_move.y, agent_outcome.y, agent_move, agent_outcome,
          ev_rock_total, ev_paper_total, ev_scissors_total,
          ev_rock_prev_move, ev_paper_prev_move, ev_scissors_prev_move,
@@ -941,7 +723,7 @@ bot_results_combined %>%
 
 # How many times does the full agent win when one *or the other* individual agent doesn't win
 bot_results_combined %>%
-  filter(full_agent_outcome == "win" & 
+  filter(full_agent_outcome == "win" &
            ((prev_move_agent_outcome == "win" & opponent_prev_move_agent_outcome != "win") |
            (prev_move_agent_outcome != "win" & opponent_prev_move_agent_outcome == "win"))) %>%
   filter(bot_strategy == "win_nil_lose_positive") %>%
@@ -964,7 +746,7 @@ bot_results_combined %>%
 
 # Given the above, how many times does the full agent *not* win and one of the individual agents wins?
 bot_results_combined %>%
-  filter(full_agent_outcome != "win" & 
+  filter(full_agent_outcome != "win" &
            ((prev_move_agent_outcome == "win" & opponent_prev_move_agent_outcome != "win") |
               (prev_move_agent_outcome != "win" & opponent_prev_move_agent_outcome == "win"))) %>%
   filter(bot_strategy == "win_nil_lose_positive") %>%
@@ -1115,15 +897,15 @@ move_choices = c(0, 1, 2) # rock, paper, scissors
 transitions = c(0.5, 0.3, 0.2) # p_transition_up, p_transition_down, p_transition_stay
 transition_probs = matrix(c(c(transitions[3], transitions[1], transitions[2]), # row = previous move, col = next move
                           c(transitions[2], transitions[3], transitions[1]),
-                          c(transitions[1], transitions[2], transitions[3])), 
+                          c(transitions[1], transitions[2], transitions[3])),
                           nrow = 3,
                           dimnames = list(move_choices, move_choices))
 
 # globals: move calculate outcome matrix
-bot_next_move = matrix(rep(move_choices, 3), 
+bot_next_move = matrix(rep(move_choices, 3),
                        nrow = 3,
                        dimnames = list(move_choices, move_choices))
-agent_next_move = matrix(rep(move_choices, each = 3), 
+agent_next_move = matrix(rep(move_choices, each = 3),
                          nrow = 3,
                          dimnames = list(move_choices, move_choices))
 outcome_mat = (agent_next_move - bot_next_move) %% 3 # rows = opponent move, cols = agent move
@@ -1131,7 +913,7 @@ outcome_mat[outcome_mat == 1] = POINTS_WIN
 outcome_mat[outcome_mat == 2] = POINTS_LOSS
 
 prev_move = "0" # this can be 0, 1, or 2 (as string) and can be bot prev move or bot opponent prev move
-p_bot_next_move = matrix(rep(transition_probs[prev_move,], 3), 
+p_bot_next_move = matrix(rep(transition_probs[prev_move,], 3),
                          nrow = 3)
 
 EV = colSums(p_bot_next_move * outcome_mat)
