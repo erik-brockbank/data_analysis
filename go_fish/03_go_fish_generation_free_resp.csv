@@ -1,0 +1,78 @@
+subjID,is_control,free_response,generation_start_ts,generation_end_ts
+user_1579305710969,True,I looked at the colors and shapes of lure combination that my friend caught fishes. I approved the one that was similar to those.,1579307589739,1579307912125
+user_1579194678938,False,whether the bottom one is round or not,1579194961623,1579194986062
+user_1579284326081,True,"comparison with the shown example.
+if A combination catches fish --> similar one will catch 
+if B combination does not catch fish --> similar one will not catch fish
+
+similarity in color, shape.
+if too different in color like a change from red circle to green circle,
+I assumed it would not have the same effect ",1579284696836,1579284846411
+user_1579215643144,False,"I couldn't really find a rule, but I believe that yellow, red, and the purple dot are appealing to the fish.",1579216046934,1579216086149
+user_1579197988272,False,If the lure combination had some kind of relevant form for the fish to realize and think it is not a novel object/creature,1579198605628,1579198654866
+user_1579215658114,False,"No matter what's on the upper side, I just looked at the lower shape to see if it's spiky",1579216017441,1579216049233
+user_1579215605616,False,the object in the end of the lure has to have many angles ,1579216028187,1579216068115
+user_1579305551774,True,"When the shape at the bottom of the picture was round, it would not catch a fish, because the fish's mouth would just slip through, whereas when they were pointy, they could hook on better to the fish. Color, nor the purple dots, nor the top/bigger shape matter.
+",1579306325789,1579306427982
+user_1579197975863,True,"if the shape of the lower part of the lure has caught a fish before, that shape will catch another fish when combined with any other shapes above it",1579198206918,1579198251934
+user_1579305576041,True,"The rule I used if the fish would be caught is if the whatever was hanging off the end (the bottom of the lure) had a sharp edge, so when fish bite they would get stuck.",1579305914851,1579305957748
+user_1579284442919,False,The bottom part of the lure needs to be a shape with more than 1 point. so circles and cone shapes will not get any fish. ,1579285319119,1579285363453
+user_1579197956417,True,"I look at the color combination of the lure, and I check which color will best attract the fish.",1579198322685,1579198369788
+user_1579197963470,False,I looked at the color of the lure to decide whether or not each lure combination would catch fish.,1579198371914,1579198412227
+user_1579219227658,True,The single best rule that I used for deciding whether or not each lure combination will catch fish was that the bottom shape would indicate if the lure will catch fish based on previous combinations in which they consisted of.,1579219983954,1579220086153
+user_1579305566870,True,"Looked at each component of the lure and if it did not work in other situations, then fish was not caught. ",1579306171205,1579306241798
+user_1579208200966,False,The lure need to have either yellow or red color. And each lure would have a small purple circle on the yellow/red part of the lure. ,1579208785523,1579208852348
+user_1579212319954,True,"for the first lure, I just guess if it can catch a fish. But after a few trials, I started to find the shape that are most likely catch the fish and compared it with a novel lure and see if there are any patterns or combination that make it either can catch a fish or not.",1579212729128,1579212866458
+user_1579219153464,True,"If it had any of the same colors marked in accordance to where it was at, then it was a good combination. The shapes and others did not matter in my opnion. ",1579219539293,1579219575596
+user_1579284342519,False,"If the bottom of the lure was round, it would not catch a fish. Only lures with a pointy tip would.",1579284801090,1579284845161
+user_1579287780266,True,"If the shape at the bottom is round, it will not catch fish. If the shape at the bottom is sharp/has angles, it will catch fish. ",1579288052398,1579288096661
+user_1579284397497,True,A lure combination can catch fish if it has orange circle with purple dot or yellow with purple dot.,1579285357699,1579285419449
+user_1579194691731,True,I based it on whether the bottom shape or color was similar to a lure that did catch fish.,1579195279575,1579195369615
+user_1579212340838,False,angle point at the bottom of the lure,1579212688709,1579212712339
+user_1579212226365,True,"The only thing that decides whether the fishing lure works is that the bottom shape has to have angle, such as star, triangle, and square. For the bottoms such as banana shape and circle, since there is no angle in these shapes, therefore won't catch a fish. ",1579212644062,1579212725154
+user_1579219158469,False,"the pointier the end of the lure is, the better chances one gets at catching a fish",1579219630642,1579219697111
+user_1579208538125,False,if the smaller shape was sharp/ had corners or not,1579209227001,1579209258985
+user_1579194724670,False,Whether or not it was realistically going to fit into the fish's mouth and not slide out or allow the fish let go,1579195052499,1579195100552
+user_1579208807017,True,Shape and color of the biggest portion of the lure. Reds and circular shapes seemed to attract many fish.,1579209104615,1579209139479
+user_1579212382927,True,I took note of the shape of the lure combination that caught fish. I noticed that the lure combination always or most of the time had a round or oval body with a dot inside and the shape it usually touched had a pointy edge.,1579213193198,1579213288607
+user_1579194662020,False,"I thought it was smooth top, pointy bottom but that was clearly wrong",1579194995853,1579195016139
+user_1579194695509,False,"The best rule to decide if the combination will catch fish is to look at the bottom shape. If the bottom shape is round (or has no edges), the lure will not catch fish. If the bottom shape has sharp edges (diamond, triangle, etc), the lure will catch fish.",1579195698619,1579195855235
+user_1579215628572,False,"The presence of a single purple spot in the lure seemed to be a common factor within all the lures that caught fish. Once I realized that, it became the main rule I used to decide whether or not each lure combination will catch fish.",1579216017973,1579216076402
+user_1579194713221,False,Shape,1579195288291,1579195295011
+user_1579194668636,False,The bottom of the lure must contain some form of a point. ,1579194983450,1579195001337
+user_1579287829598,True,If the bottom portion was similar to a previous example that caught the fish.,1579288278276,1579288302532
+user_1579198652845,False,"The upper shape of the fish lure could be any shape, however the bottom shape MUST be pointy (triangle, diamond, etc.)",1579199122119,1579199190662
+user_1579208311948,False,It seems like the combinations that have bottom parts with pointy ends catch fish. ,1579208731055,1579208764889
+user_1579305586898,True,At first it was if it is not the same it won't catch fish but now I think if the top which was the bigger part is the same than it will catch fish or not if the given combo doesn't catch fish ,1579306240074,1579306337369
+user_1579198000158,False,Shape of the lure ,1579198286940,1579198303492
+user_1579215578091,False,"The single best rule for deciding whether each lure combination caught a fish is whether it had a pointy or round bottom end. The top article did not matter. The pointy bottom end was able to catch the fish, most likely because of its pointy characteristic that would pierce the fish's mouth and hang onto it. ",1579215936873,1579216049895
+user_1579208189179,True,"If the second lure has similarities with the previous lure, mainly looking at colors and shapes.",1579209151377,1579209239463
+user_1579284327417,True,"Based on previous combinations of shapes, if a shape repeatedly did not catch fish in the past, then I assumed it would not work in the future. For example, the circle seemed to not catch fish, so when a smaller circle was attached to a larger object, I would assume it would not catch a fish. ",1579284562949,1579284633614
+user_1579197924760,False,"whether the small front part contains round/smooth shapes. If the shape contains round or smooth part, then it doesn't catch the fish. If the front part is square or triangle, then it catches the fish. ",1579198634682,1579198721776
+user_1579215634553,True,I started to realize that it had to do with the shape of the bottom piece. The round pieces did not catch fish while the ones with corners did.,1579216447705,1579216496144
+user_1579215695067,True,The attachment at the bottom should not be round.,1579216099782,1579216124253
+user_1579219138051,False,I checked whether or not the lure resembled prey for the fish or if it resembled a predator. ,1579219604501,1579219636677
+user_1579212222581,False,"only with the shape that has corners or angles, such as square and triangle, will be able to catch the fish",1579212700284,1579212771364
+user_1579305885489,True,the single best rule i used was to observe the smaller shape and make sure that the end on the bottom of it was pointed.,1579306270612,1579306323643
+user_1579284396381,False,"Guessing at first, then I start to combine the lure shape with my real life fishing experience, next I compare the difference between the shapes.",1579284708539,1579284777059
+user_1579212329168,True,The best combination for catching fish is whether or not two shapes are similar to each other.,1579212678166,1579212721149
+user_1579287804113,True,The shapes of the lure ,1579288388259,1579288435915
+user_1579305912827,True,whether the similar pattern has shown in the previous cases,1579306838655,1579306891327
+user_1579219186091,True,if it had a triangle in the combination,1579219533758,1579219553470
+user_1579197986612,False,the combination that will catch fish is the one with upside down triangle bottom,1579198701072,1579198751745
+user_1579305561565,True,"The fish cannot latch onto the bottom,smaller attachment when it is round;can only latch on when it is angular. That is why all of the fish latched onto the diamond or triangular attachments but not to the round ones. I don't think color or the shape of the larger body of the latch are important.",1579306244128,1579306375142
+user_1579287849867,True,"I will compare the given shape of combination in the question and the previous ones and see if they have anything in common. If the combination has the features of those successful examples, then I would assume it can catch fish. ",1579288547779,1579288666410
+user_1579287866563,True,"In deciding which lure is optimal for catching fish, I looked for the presence of a purple dot on the larger base of the lure, and a pointed smaller shape attached to the base. I think the last successful lure, though, had a pointed base, and a rounded attachment, which is the opposite trend that I observed in the precursor lures.",1579288883539,1579288981531
+user_1579284401246,False,"The rule I used for deciding whether or not each lure combination would catch fish was based on the smaller end part of the lure. If the shape had corners and straight lines, the fish would bite. If the end of the lure was rounded the fish would not. ",1579284792357,1579284862821
+user_1579215646109,True,"i do not know
+",1579216788560,1579216805735
+user_1579219134310,False,I focused on whether the lure combination had a purple dot or a circular shape on the top.,1579219531226,1579219557633
+user_1579208211705,False,using the shape and the color of the lure combination was how I decided whether or not my friend will be able to catch a fish. ,1579208829288,1579208911312
+user_1579219155320,True,"Is the top shape smooth, and is the bottom shape pointy",1579219423094,1579219445854
+user_1579212320210,False,the lure needs to have pointy edges at the bottom ,1579212794540,1579212836515
+user_1579208201031,True,I tried to guess if it was shape combination that helped me decide whether or not to use each lure combination,1579208589555,1579208626577
+user_1579208242783,False,i used the rule of shape to determine if the fish would bite the lure. I also used as a second the color that the lures used.,1579208867119,1579208912502
+user_1579219127588,False,"The lure must have two purple dots, at least one edge sticking out, and semi circular shape that the top. ",1579219724518,1579219797005
+user_1579284368207,True,How much it matched the past combinations that did catch a fish and how much it didn't match past combinations that did not catch a fish.,1579284648210,1579284685922
+user_1579212345756,False,Lure combination has to have sharp edges in both top and bottom to catch the fish.,1579212635513,1579212662024
+user_1579287784902,True,"the rule I used is if a lure that catches fish shares more than 2 similarities with another lure, for example it they share the same base (ex. yellow triangle) and attachment (ex. blue square) but the second lure doesn't share the third piece of the lure (ex. purple circle). If they share more similarities with each other in theory the other lure should also catch fish.",1579288135515,1579288316550

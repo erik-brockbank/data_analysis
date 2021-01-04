@@ -1,0 +1,362 @@
+---
+title: "RPS analysis - Cogsci"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(message = FALSE, echo = FALSE)
+
+library(knitr)
+library(tidyverse)
+library(viridis)
+```
+
+
+```{r globals}
+# file containing full dataset for all rounds
+DATA_FILE = "rps_data.csv"
+# file containing free response data by participant
+FREE_RESP_FILE = "rps_data_freeResp.csv"
+# file containing slider Likert data by participant
+SLIDER_FILE = "rps_data_sliderData.csv"
+
+# moves available to each player
+MOVE_SET = c("rock", "paper", "scissors")
+# number of RPS rounds played in each complete game
+RPS_ROUNDS = 300
+
+# number of samples to use when generating null
+NULL_SAMPLES = 10000
+# maximum win differential when plotting and running chi-sq
+MAX_WIN_DIFF = 80
+# maximum round lag for acf analysis
+MAX_LAG = 10
+
+# Score differential for each move combination (player in rows, opponent in cols)
+OUTCOME_MATRIX = matrix(c(0, -1, 1, 1, 0, -1, -1, 1, 0), nrow = 3, byrow = TRUE)
+rownames(OUTCOME_MATRIX) = c("rock", "paper", "scissors")
+colnames(OUTCOME_MATRIX) = c("opp_rock", "opp_paper", "opp_scissors")
+
+```
+
+
+```{r processing_fxns}
+# Read in and process main data file with game results
+read_raw_data = function(filename) {
+  # read aggregate data
+  data = read_csv(filename)
+  # remove participants that didn't complete all 300 rounds
+  incomplete = data %>%
+    group_by(player_id) %>%
+    summarize(rounds = max(round_index)) %>%
+    filter(rounds < RPS_ROUNDS) %>%
+    select(player_id)
+  data = data %>%
+    filter(!(player_id %in% incomplete$player_id))
+  
+  return(data)
+}
+
+
+# Read in and process free response and Likert data
+read_resp_data = function(filename, raw_data) {
+  resp_data = read_csv(filename)
+  # Remove any participants not in raw_data
+  resp_data = resp_data %>%
+    filter(player_id %in% unique(raw_data$player_id))
+  return(resp_data)
+}
+
+
+# Function for selecting a single player's data from each game
+# (avoids duplcate auto-correlation calculations for each game since outcomes 
+# for each player in a given game are complementary)
+get_unique_game_data = function(data) {
+  data %>%
+    group_by(game_id, round_index) %>%
+    filter(row_number() == 1)
+}
+
+
+# Get distribution of win count differentials for empirical data
+get_emp_win_count_differential = function(data) {
+  win_diff = data %>%
+    group_by(game_id, player_id) %>%
+    count(win_count = player_outcome == "win") %>%
+    filter(win_count == TRUE) %>%
+    group_by(game_id) %>%
+    mutate(opp_win_count = lag(n, 1)) %>%
+    filter(!is.na(opp_win_count)) %>%
+    summarize(win_diff = abs(n - opp_win_count))
+  return(win_diff)
+}
+
+# Generate sample distribution for expected win count differential
+get_sample_win_count_differential = function(reps) {
+  win_diff_sample = data.frame(
+    win_diff = replicate(reps, abs(sum(sample(c(-1, 0, 1), RPS_ROUNDS, replace = T))))
+  )
+  return(win_diff_sample)
+}
+
+
+# Get auto-correlation of game outcomes at increasing round lags
+get_game_acf = function(unique_game_data, max_lag) {
+  # data frame for keeping track of auto-correlation by game
+  acf_agg = data.frame(game = character(),
+                       lag = numeric(),
+                       acf = numeric())
+  # code outcomes as numeric
+  unique_game_data = unique_game_data %>%
+    mutate(points_symmetric = case_when(player_outcome == "win" ~ 1,
+                                        player_outcome == "loss" ~ -1,
+                                        player_outcome == "tie" ~ 0))
+  # fill in data frame
+  for (game in unique(unique_game_data$game_id)) {
+    game_data = unique_game_data %>%
+      # TODO what's going on with these na outcomes???
+      filter(game_id == game & !is.na(player_outcome))
+    game_acf = acf(game_data$points_symmetric, lag.max = max_lag, plot = FALSE)
+    
+    acf_agg = rbind(acf_agg, data.frame(game = game, lag = seq(0, max_lag), acf = game_acf[[1]]))
+  }
+  return(acf_agg)
+}
+
+# Function to get marginal probability of each move for each participant
+get_player_move_dist = function(data) {
+  data %>%
+    filter(player_move != "none") %>% # ignore "none" moves for this aggregation
+    group_by(player_id) %>%
+    count(player_move) %>%
+    mutate(total = sum(n),
+           pmove = n / total) %>%
+    # order by "rock", "paper", "scissors"
+    arrange(player_id, factor(player_move, levels = MOVE_SET))
+}
+
+
+# Get maximum expected win count differential based on move probabilities in player_summary
+get_expected_win_count_differential = function(player_summary) {
+  player_summary %>%
+    group_by(player_id) %>%
+    summarize(max_util = max(
+      rowSums(matrix(rep(pmove, 3), nrow = 3, byrow = T) * OUTCOME_MATRIX))) %>%
+    mutate(win_diff = max_util * RPS_ROUNDS)
+}
+
+
+# Get summary stats for win count differential
+get_win_count_differential_summary = function(data, category) {
+  data %>%
+    summarize(
+      category = category,
+      mean_wins = mean(win_diff),
+      n = n(),
+      se = sd(win_diff) / sqrt(n),
+      ci_lower = mean_wins - se,
+      ci_upper = mean_wins + se
+    )
+}
+
+```
+
+
+```{r graphing_fxns}
+WIN_COUNT_SUMMARY_LABELS = c("empirical" = "Empirical results",
+                             "null_sample" = "Sampled null distribution",
+                             "move_probability" = "Expected value, move probabilities")
+
+# Default theme for graph styles
+individ_plot_theme = theme(
+  # titles
+  plot.title = element_text(face = "bold", size = 24),
+  axis.title.y = element_text(face = "bold", size = 20),
+  axis.title.x = element_text(face = "bold", size = 20),
+  legend.title = element_text(face = "bold", size = 16),
+  # axis text
+  axis.text.y = element_text(size = 12),
+  axis.text.x = element_text(size = 12, angle = 45, vjust = 0.5),
+  # legend text
+  legend.text = element_text(size = 14),
+  # facet text
+  strip.text = element_text(size = 12),
+  # backgrounds, lines
+  panel.background = element_blank(),
+  strip.background = element_blank(),
+  
+  panel.grid = element_line(color = "gray"),
+  axis.line = element_line(color = "black"),
+  # positioning
+  legend.position = "bottom"
+)
+
+
+# Plot histogram of win count differentials for each dyad
+plot_win_differentials = function(win_diff, max, title, color, hide_y) {
+  if (hide_y) {
+    individ_plot_theme$axis.text.y = element_blank()
+  }
+  win_diff %>%
+    ggplot(aes(x = win_diff)) +
+    geom_histogram(color = color, fill = color, alpha = 0.5, breaks = c(seq(0, max, by = 10))) +
+    labs(x = "", y = "Count") +
+    ggtitle(title) +
+    individ_plot_theme
+}
+
+
+plot_acf = function(acf_data) {
+  summary_acf = acf_data %>%
+    group_by(lag) %>%
+    summarize(mean_acf = mean(acf))
+  
+  acf_data %>%
+    ggplot(aes(x = lag, y = acf)) +
+    geom_jitter(alpha = 0.5, width = 0.1, color = "blue", size = 2) +
+    geom_point(data = summary_acf, aes(x = lag, y = mean_acf), color = "red", size = 3) +
+    scale_x_continuous(breaks = seq(0, max(acf_data$lag))) +
+    labs(x = "Lag", y = "Auto-correlation") +
+    ggtitle("Auto-correlation of round outcomes") +
+    individ_plot_theme
+}
+
+
+plot_win_differential_summary = function(win_diff_summary) {
+  win_diff_summary %>%
+    ggplot(aes(x = factor(category, levels = c("empirical", "null_sample", "move_probability")), 
+               y = mean_wins, 
+               color = factor(category, levels = c("empirical", "null_sample", "move_probability")))) +
+    geom_point(size = 5) +
+    geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.25) +
+    labs(x = "", y = "Win Count Differential") +
+    scale_color_viridis(discrete = TRUE,
+                        name = element_blank(),
+                        labels = WIN_COUNT_SUMMARY_LABELS) +
+    individ_plot_theme +
+    theme(axis.text.x = element_blank(),
+          axis.text.y = element_text(face = "bold", size = 14),
+          legend.text = element_text(face = "bold", size = 16))
+}
+```
+
+
+# Introduction #
+Human conflict and coordination is in many ways defined by our ability to reason about and predict the behavior of others in order to make plans of our own. What kind of cognitive processes underlie this unique ability? In this study, we investigate people's ability to adapt to the behavior of others in an adversarial setting in the simple game of Rock, Paper, Scissors (or Roshambo). 
+
+# Methods #
+
+## Participants ##
+Participants were 128 college students who received course credit for their participation. Participants were assigned to stable dyads during the experiment (except in two cases where odd numbers precluded dyad formation); of 62 dyads, four were removed due to technical issues which prevented their completion of all 300 rounds, leaving 58 dyads with complete data. 
+
+
+# Results #
+In repeated games of Rock, Paper, Scissors, the Nash Equilibrium strategy is random play: this is the only way in which a player can prevent her opponent from exploiting patterns in her own moves. However, given the opportunity for exploiting any non-random behavior, an RPS player is incentivized to look for any patterns or dependencies in her opponent's moves which might indicate non-random behavior and thus give her an edge in predicting her opponent's next move. Indeed, prior research has shown that "subjective randomness", or people's impressions of what constitutes a random sequence, consitutes only a subset of what might be generated by truly random behavior [citation]. In other words, people are not very good at being random, suggesting that a player who pays attention to her opponent's moves may have a great deal to gain over the course of many rounds of the game. 
+
+Of course it's entirely possible that people do not detect such dependencies in their opponent's moves (or conversely, that dependencies people exhibit are more complex or noisy than any opponent could reasonably be expected to detect). Our analysis therefore focuses on two primary questions:
+
+1.) Do people show evidence of exploiting patterns or dependencies in their opponent's move selections?
+
+2.) Is their behavior maximally exploitative or are they leaving "points" on the table?
+
+The first question asks whether people's behavior in RPS exhibits evidence of anything other than random play or behavior which otherwise fails to detect and exploit any dependencies in their opponent's move choices. In the results below, we find there is indeed evidence of participants exploiting their opponents beyond what might be expected by random play. The second question deals with how exploitable people's moves tend to be; does the exploitative behavior we see in the first analysis reflect optimal reasoning about opponent behavior or are people leaving points on the table? And if so, what might explain their failure to be maximally exploitative? [SUMMARIZE FINDINGS HERE].
+
+
+```{r data_processing}
+raw_data = read_raw_data(DATA_FILE)
+fr_data = read_resp_data(FREE_RESP_FILE, raw_data)
+slider_data = read_resp_data(SLIDER_FILE, raw_data)
+
+```
+
+
+## Are people exploiting? ##
+
+First we look at aggregate win count differentials across dyads. Below we compare the empirical distribution of win count differentials to a sampled null distribution.
+
+
+```{r win_distribution, warning=FALSE}
+# Get empirical and sampled distribution of point differentials
+win_count_diff_empirical = get_emp_win_count_differential(raw_data)
+win_count_diff_null = get_sample_win_count_differential(NULL_SAMPLES)
+# Plot empirical score difference at end of game for each dyad
+plot_win_differentials(win_count_diff_empirical, MAX_WIN_DIFF, "Empirical Win Count Differences", "blue", FALSE)
+plot_win_differentials(win_count_diff_null, MAX_WIN_DIFF, "Null Sampled Win Count Differences", "red", TRUE)
+
+
+# Chi-squared comparison of empirical and null counts
+emp_win_count_bins = win_count_diff_empirical %>%
+  group_by(bin = cut(win_diff, breaks = seq(0, MAX_WIN_DIFF, by = 10), include.lowest = TRUE)) %>% 
+  summarise(n = n())
+
+null_win_count_bins = win_count_diff_null %>%
+  group_by(bin = cut(win_diff, breaks = seq(0, MAX_WIN_DIFF, by = 10), include.lowest = TRUE)) %>% 
+  summarise(n = n()) %>%
+  mutate(prop = n / sum(n))
+
+chisq_comparison = chisq.test(emp_win_count_bins$n, p = null_win_count_bins$prop)
+```
+
+
+It's clear that the empirical distribution has a substantially heavier tail (mean = `r round(mean(win_count_diff_empirical$win_diff), 2)` and SEM = `r round(sd(win_count_diff_empirical$win_diff) / sqrt(nrow(win_count_diff_empirical)), 2)`) compared to the null distribution (mean = `r round(mean(win_count_diff_null$win_diff), 2)`), suggesting that there are more dyads in the empirical distribution where one pair in the dyad is able to exploit their opponent. Indeed, using the same bins as shown in the figure above, the empirical count of win differentials is significantly different from the proportions generated by the sampled null distribution ($\chi^2$ (`r chisq_comparison$parameter`) = `r round(chisq_comparison$statistic, 2)`, *p* `r ifelse(chisq_comparison$p.value < 0.001, "< 0.001", round(chisq_comparison$p.value, 3))`).
+
+Note: is it possible that we get this distribution from dyads trying and failing to be random? (subjective randomnees against subjective randomness leads to heavier win count differential distribution?)
+
+What could account for the exploiting happening in the experimental dyads? One possibility is that players are sensitive to transient dependencies in their opponent's move choices from one round to the next, allowing them to in effect go on "win streaks". 
+
+To test this, we examine the auto-correlation of outcomes in each dyad. If participants are exploiting their opponents in "streaks", a win should be more likely after a player just won (and vice versa for a loss). The figure below shows auto-correlation of round outcomes over increasing round lags on $x$: since outcomes are complementary, each blue dot indicates one of the participants in a dyad with the average across dyads shown in red. 
+
+
+```{r auto_corr_analysis}
+# Get data for one person in each dyad
+unique_game_data = get_unique_game_data(raw_data)
+# Get ACF data
+acf_agg = get_game_acf(unique_game_data, MAX_LAG)
+# Plot ACF data
+plot_acf(acf_agg)
+```
+
+
+Though there appears to be one dyad which had a high degree of outcome auto-correlation and some that approached meaningful correlations at a lag of 1 or 2 rounds, we find very little dependency on previous outcomes. This suggests that people's ability to exploit their opponents may not come from discovering dependencies in their opponent's moves from one round to the next but rather from overall patterns in their opponent's choices across many rounds. In short, the best account of exploiting in the RPS game is that it occurs far more than would be expected by random play, but only when considering the games in aggregate. 
+
+
+## How much could people be exploited? ##
+
+The finding that participants exploit their opponents but not at a level that produces high auto-correlation of outcomes from round to round raises a natural question: is this simply the most that people *can* be exploited? Or are participants "leaving points on the table" by failing to discover more substantial dependencies in their opponents' move choices?
+
+
+```{r ev_analysis}
+# Get overall probability of each move (for each player)
+player_summary = get_player_move_dist(raw_data)
+
+# get max utility value for opponent of each player based on each player's move probability
+player_utils = get_expected_win_count_differential(player_summary)
+
+# plot expected win differentials based on move probability data
+plot_win_differentials(player_utils, MAX_WIN_DIFF, "E[Win Count Differences]", "seagreen", FALSE)
+
+```
+
+
+
+```{r ev_summary}
+# Summarize win count differential across empirical, sampled null, and expected value
+win_count_diff_summary = bind_rows(
+  get_win_count_differential_summary(win_count_diff_empirical, "empirical"),
+  get_win_count_differential_summary(win_count_diff_null, "null_sample"),
+  get_win_count_differential_summary(player_utils, "move_probability")
+)
+
+
+# plot summary of win count differentials for EV alongside empirical and null data
+plot_win_differential_summary(win_count_diff_summary)
+
+```
+
+
+
+
+
+
+
+

@@ -13,15 +13,22 @@ setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
 
 library(tidyverse)
 library(viridis)
+<<<<<<< HEAD
 library(patchwork)
+=======
+
+>>>>>>> 90dd038de111de39b8cefa609f837c9ed98b4579
 
 
 DATA_FILE = "rps_v1_data.csv" # name of file containing full dataset for all rounds
 FREE_RESP_FILE = "rps_v1_data_freeResp.csv" # name of file containing free response data by participant
 SLIDER_FILE = "rps_v1_data_sliderData.csv" # name of file containing slider Likert data by participant
 
+<<<<<<< HEAD
 NULL_SAMPLES = 10000
 
+=======
+>>>>>>> 90dd038de111de39b8cefa609f837c9ed98b4579
 # Pilot info
 # PILOT_DATA_FILE = "rps_pilot.csv" # name of file containing full dataset for all *pilot* rounds
 # Participant IDs who played only 100 rounds (NB: this applies to pilot data only)
@@ -82,7 +89,10 @@ get_sample_score_differential = function(reps) {
 
 get_sample_win_count_differential = function(reps) {
   win_diff_sample = data.frame(
+<<<<<<< HEAD
     game_id = seq(1:reps),
+=======
+>>>>>>> 90dd038de111de39b8cefa609f837c9ed98b4579
     win_diff = replicate(reps, abs(sum(sample(c(-1, 0, 1), 300, replace = T))))
   )
   return(win_diff_sample)
@@ -207,8 +217,23 @@ plot.moves = function(data) {
 }
 
 # Check how well-matched players were in each dyad
+<<<<<<< HEAD
 plot.outcomes = function(outcome_summary) {
   outcome_summary %>%
+=======
+plot.outcomes = function(data) {
+  outcome.summary = data %>%
+    group_by(game_id, round_index) %>%
+    filter(row_number() == 1) %>%
+    ungroup() %>%
+    group_by(game_id) %>%
+    count(player_outcome) %>%
+    mutate(total = sum(n),
+           outcome_pct = n / total,
+           game_id_abbrev = strsplit(game_id, "-")[[1]][5])
+  
+  outcome.summary %>%
+>>>>>>> 90dd038de111de39b8cefa609f837c9ed98b4579
     ggplot(aes(x = player_outcome, y = outcome_pct)) +
     geom_bar(stat = "identity", width = 0.5, color = "blue", fill = "blue", alpha = 0.5) +
     geom_hline(yintercept = 0.33, linetype = "dashed", color = "red") +
@@ -347,6 +372,7 @@ plot.moves(data) # some of these people don't appear to have a stable balance of
 
 
 ### Outcomes ###
+<<<<<<< HEAD
 outcome_summary = data %>%
   group_by(game_id, round_index) %>%
   filter(row_number() == 1) %>%
@@ -359,6 +385,9 @@ outcome_summary = data %>%
          game_id_abbrev = strsplit(game_id, "-")[[1]][5])
 
 plot.outcomes(outcome_summary) # No players appear wildly mismatched, though score differential does suggest there may have been a couple
+=======
+plot.outcomes(data) # No players appear wildly mismatched, though score differential does suggest there may have been a couple
+>>>>>>> 90dd038de111de39b8cefa609f837c9ed98b4579
 
 
 
@@ -371,12 +400,17 @@ mean(score_diff_empirical$point_diff)
 sd(score_diff_empirical$point_diff) / sqrt(nrow(score_diff_empirical))
 
 
+<<<<<<< HEAD
 score_diff_null = get_sample_score_differential(NULL_SAMPLES)
+=======
+score_diff_null = get_sample_score_differential(10000)
+>>>>>>> 90dd038de111de39b8cefa609f837c9ed98b4579
 plot.score.differentials(score_diff_null, "Sampled Null Data", "red")
 # Summary stats
 mean(score_diff_null$point_diff)
 
 
+<<<<<<< HEAD
 ### Win count differentials ###
 # Empirical win count differentials
 win_count_diff_empirical = get_emp_win_differential(data)
@@ -511,6 +545,19 @@ win_diff_comparison %>%
 
 
 
+=======
+### Win counts ###
+win_diff_empirical = get_emp_win_differential(data)
+plot.win.differentials(win_diff_empirical, "Distribution of win count differentials", "Empirical data")
+# Summary stats
+mean(win_diff_empirical$win_diff)
+sd(win_diff_empirical$win_diff) / sqrt(nrow(win_diff_empirical))
+
+win_diff_null = get_sample_win_count_differential(10000)
+plot.win.differentials(win_diff_null, "Distribution of win count differentials", "Sampled null data")
+# Summary stats
+mean(win_diff_null$win_diff)
+>>>>>>> 90dd038de111de39b8cefa609f837c9ed98b4579
 
 
 ### Effort ###

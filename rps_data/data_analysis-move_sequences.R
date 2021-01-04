@@ -77,4 +77,7 @@ chisq.test(seq.counts3$n, p = seq.counts3$pct_expected)
 
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 90dd038de111de39b8cefa609f837c9ed98b4579
