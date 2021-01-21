@@ -9,101 +9,53 @@
 # SETUP ========================================================================
 
 setwd("/Users/erikbrockbank/web/vullab/data_analysis/rps_data/")
-rm(list = ls())
+# rm(list = ls())
+library(tidyverse)
 library(viridis)
 library(patchwork)
-library(tidyverse)
 
 
 
 # GLOBALS ======================================================================
 
-DATA_FILE = "rps_v3_data.csv" # name of file containing full dataset for all rounds
-FREE_RESP_FILE = "rps_v3_data_freeResp.csv" # file containing free response data by participant
-SLIDER_FILE = "rps_v3_data_sliderData.csv" # file containing slider Likert data by participant
+DATA_FILE = "../../rps/analysis/rps_v3_data.csv" # name of file containing full dataset for all rounds
+FREE_RESP_FILE = "../../rps/analysis/rps_v3_data_freeResp.csv" # file containing free response data by participant
+SLIDER_FILE = "../../rps/analysis/rps_v3_data_sliderData.csv" # file containing slider Likert data by participant
 NUM_ROUNDS = 300 # number of rounds in each complete game
 
+# In order of complexity
 STRATEGY_LEVELS = c(
-  "opponent_moves",
-  "opponent_prev_moves",
-  "bot_prev_move",
-  "opponent_bot_prev_move",
-  "opponent_prev_two_moves",
-  "bot_prev_two_moves",
+  # 1x3
+  # "opponent_moves",
   "opponent_transitions",
   "opponent_courn_transitions",
+  # 3x3
+  "opponent_prev_move",
+  "bot_prev_move",
   "opponent_outcome_transitions",
+  # 9x3
+  "opponent_bot_prev_move",
+  "opponent_prev_two_moves",
+  # "bot_prev_two_moves",
   "opponent_outcome_prev_transition_dual"
 )
 
 STRATEGY_LOOKUP = list(
-  "opponent_moves" = "Move distribution",
-  "opponent_prev_moves" = "Player previous move",
-  "bot_prev_move" = "Bot previous move",
-  "opponent_bot_prev_move" = "Player + bot previous move",
-  "opponent_prev_two_moves" = "Player previous two moves",
-  "bot_prev_two_moves" = "Bot previous two moves",
-  "opponent_transitions" = "Player transitions (+/-/0)",
-  "opponent_courn_transitions" = "Player Cournot transitions (+/-/0)",
-  "opponent_outcome_transitions" = "Player outcome transitions",
-  "opponent_outcome_prev_transition_dual" = "Player outcome + previous transition"
+  # "opponent_moves" = "Move distribution",
+  "opponent_prev_move" = "Choice given player's prior choice",
+  "bot_prev_move" = "Choice given opponent's prior choice",
+  "opponent_bot_prev_move" = "Choice given player's prior choice & opponent's prior choice",
+  "opponent_prev_two_moves" = "Choice given player's prior two choices",
+  # "bot_prev_two_moves" = "Bot previous two moves",
+  "opponent_transitions" = "Transition baserate (+/-/0)",
+  "opponent_courn_transitions" = "Opponent transition baserate (+/-/0)",
+  "opponent_outcome_transitions" = "Transition given prior outcome (W/L/T)",
+  "opponent_outcome_prev_transition_dual" = "Transition given prior transition & prior outcome"
 )
 
 
 
 # ANALYSIS FUNCTIONS ===========================================================
-
-# Generic file reading function: more specific ones below
-read_data = function(filename) {
-  data = read_csv(filename)
-  return(data)
-}
-
-
-read_game_data = function(filename) {
-  data = read_csv(filename)
-  data$bot_strategy = factor(data$bot_strategy, levels = STRATEGY_LEVELS)
-
-  # Remove all incomplete games
-  incomplete_games = data %>%
-    group_by(game_id, player_id) %>%
-    summarize(rounds = max(round_index)) %>%
-    filter(rounds < NUM_ROUNDS) %>%
-    select(game_id) %>%
-    unique()
-
-  data = data %>%
-    filter(!(game_id %in% incomplete_games$game_id))
-
-  # Remove any duplicate complete games that have the same SONA survey code
-  # NB: this can happen if somebody played all the way through but exited before receiving credit
-  # First, fetch sona survey codes with multiple complete games
-  repeat_codes = data %>%
-    group_by(sona_survey_code) %>%
-    filter(is_bot == 0) %>%
-    summarize(trials = n()) %>%
-    filter(trials > 300) %>%
-    select(sona_survey_code)
-
-  # Next, get game id for the earlier complete game
-  # NB: commented out code checks that we have slider/free resp data for at least one of the games
-  duplicate_games = data %>%
-    filter(sona_survey_code %in% repeat_codes$sona_survey_code &
-             is_bot == 0  &
-             round_index == NUM_ROUNDS) %>%
-    select(sona_survey_code, game_id, player_id, round_begin_ts) %>%
-    # remove the earlier one since the later one has free response and slider data (confirm with joins below)
-    group_by(sona_survey_code) %>%
-    filter(round_begin_ts == min(round_begin_ts)) %>%
-    # inner_join(fr_data, by = c("game_id", "player_id")) %>%
-    # inner_join(slider_data, by = c("game_id", "player_id")) %>%
-    distinct(game_id)
-
-  data = data %>%
-    filter(!game_id %in% duplicate_games$game_id)
-
-  return(data)
-}
 
 # Read in and process free response data
 read_free_resp_data = function(filename, game_data) {
@@ -176,10 +128,10 @@ get_bot_strategy_win_count_differential_summary = function(strategy_data) {
 }
 
 # Divide each subject's trials into blocks of size blocksize (e.g. 10 trials)
-# then get each subject's win percent in each block
-get_subject_block_data = function(data, blocksize) {
+# then get each *bot's* win percent in each block
+get_bot_block_data = function(data, blocksize) {
   data %>%
-    filter(is_bot == 0) %>%
+    filter(is_bot == 1) %>%
     group_by(bot_strategy, round_index) %>%
     mutate(round_block = ceiling(round_index / blocksize)) %>%
     select(bot_strategy, round_index, game_id, player_id, player_outcome, round_block) %>%
@@ -190,7 +142,7 @@ get_subject_block_data = function(data, blocksize) {
     filter(win == TRUE)
 }
 
-# Take in subject block win percent (calculated above) and summarize by bot strategy across subjects
+# Take in block win percent data (calculated above) and summarize by bot strategy
 get_block_data_summary = function(subject_block_data) {
   subject_block_data %>%
     group_by(bot_strategy, round_block) %>%
@@ -228,98 +180,50 @@ default_plot_theme = theme(
   legend.key = element_rect(colour = "transparent", fill = "transparent")
 )
 
+label_width = 10
+
+strategy_labels = c("opponent_moves" = str_wrap(STRATEGY_LOOKUP[["opponent_moves"]], label_width),
+                                      "opponent_prev_move" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move"]], label_width),
+                                      "bot_prev_move" = str_wrap(STRATEGY_LOOKUP[["bot_prev_move"]], label_width),
+                                      "opponent_bot_prev_move" = str_wrap(STRATEGY_LOOKUP[["opponent_bot_prev_move"]], label_width),
+                                      "opponent_prev_two_moves" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_two_moves"]], label_width),
+                                      "bot_prev_two_moves" = str_wrap(STRATEGY_LOOKUP[["bot_prev_two_moves"]], label_width),
+                                      "opponent_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_transitions"]], label_width),
+                                      "opponent_courn_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_courn_transitions"]], label_width),
+                                      "opponent_outcome_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_outcome_transitions"]], label_width),
+                                      "opponent_outcome_prev_transition_dual" = str_wrap(STRATEGY_LOOKUP[["opponent_outcome_prev_transition_dual"]], label_width))
+
 
 # GRAPH FUNCTIONS ==============================================================
 
-plot_bot_strategy_win_count_differential_summary = function(wcd_summary) {
-  label_width = 10
-  strategy_labels = c("opponent_moves" = str_wrap(STRATEGY_LOOKUP[["opponent_moves"]], label_width),
-                      "opponent_prev_move" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move"]], label_width),
-                      "bot_prev_move" = str_wrap(STRATEGY_LOOKUP[["bot_prev_move"]], label_width),
-                      "opponent_bot_prev_move" = str_wrap(STRATEGY_LOOKUP[["opponent_bot_prev_move"]], label_width),
-                      "opponent_prev_two_moves" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_two_moves"]], label_width),
-                      "bot_prev_two_moves" = str_wrap(STRATEGY_LOOKUP[["bot_prev_two_moves"]], label_width),
-                      "opponent_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_transitions"]], label_width),
-                      "opponent_courn_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_courn_transitions"]], label_width),
-                      "opponent_outcome_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_outcome_transitions"]], label_width),
-                      "opponent_outcome_prev_transition_dual" = str_wrap(STRATEGY_LOOKUP[["opponent_outcome_prev_transition_dual"]], label_width))
-
-  wcd_summary %>%
-    ggplot(aes(x = bot_strategy, y = mean_win_count_diff)) +
-    geom_point(aes(color = bot_strategy),
-               size = 6) +
-    geom_errorbar(aes(color = bot_strategy, ymin = lower_se, ymax = upper_se),
-                  width = 0.25, size = 1) +
-    geom_hline(yintercept = 0, size = 1, linetype = "dashed", color = "red") +
-    labs(x = "", y = "Mean win count differential") +
-    ggtitle("Win count differential across bot strategies") +
-    scale_x_discrete(name = element_blank(),
-                     labels = strategy_labels) +
-    scale_color_viridis(discrete = TRUE,
-                        name = element_blank()) +
-    default_plot_theme +
-    theme(
-      # plot.title = element_text(size = 32, face = "bold"),
-      axis.title.y = element_text(size = 24, face = "bold"),
-      # axis.text.x = element_text(size = 20, face = "bold", angle = 0, vjust = 1),
-      # axis.text.x = element_text(size = 20, face = "bold", angle = 0, vjust = 1),
-      axis.text.x = element_blank(),
-      # axis.text.y = element_text(face = "bold", size = 20),
-      legend.position = "none"
-    )
-}
-
-# Plot average of each participant's win percent in blocks of trials by strategy
-plot_bot_strategy_win_pct_by_block = function(block_data_summary) {
-  label_width = 12
-  strategy_labels = c("opponent_moves" = str_wrap(STRATEGY_LOOKUP[["opponent_moves"]], label_width),
-                     "opponent_prev_move" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move"]], label_width),
-                     "bot_prev_move" = str_wrap(STRATEGY_LOOKUP[["bot_prev_move"]], label_width),
-                     "opponent_bot_prev_move" = str_wrap(STRATEGY_LOOKUP[["opponent_bot_prev_move"]], label_width),
-                     "opponent_prev_two_moves" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_two_moves"]], label_width),
-                     "bot_prev_two_moves" = str_wrap(STRATEGY_LOOKUP[["bot_prev_two_moves"]], label_width),
-                     "opponent_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_transitions"]], label_width),
-                     "opponent_courn_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_courn_transitions"]], label_width),
-                     "opponent_outcome_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_outcome_transitions"]], label_width),
-                     "opponent_outcome_prev_transition_dual" = str_wrap(STRATEGY_LOOKUP[["opponent_outcome_prev_transition_dual"]], label_width))
-
+plot_block_summary = function(summary_data, individ_data) {
   block_labels = c("1" = "30", "2" = "60", "3" = "90", "4" = "120", "5" = "150",
                    "6" = "180", "7" = "210", "8" = "240", "9" = "270", "10" = "300")
-
-  block_data_summary %>%
+  summary_data %>%
     ggplot(aes(x = round_block, y = mean_win_pct, color = bot_strategy)) +
     geom_point(size = 6, alpha = 0.75) +
     geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), size = 1, width = 0.25, alpha = 0.75) +
+    geom_jitter(data = individ_data, aes(x = round_block, y = win_pct),
+                width = 0.1, height = 0, size = 2, alpha = 0.5) +
     geom_hline(yintercept = 1 / 3, linetype = "dashed", color = "red", size = 1) +
-    labs(x = "Game round", y = "Mean win percentage") +
-    ggtitle("Participant win percentage against bot strategies") +
+    labs(x = "Game round", y = "Bot win percentage") +
+    # ggtitle("Bot win percentage against participants") +
     scale_color_viridis(discrete = T,
                         name = element_blank(),
                         labels = strategy_labels) +
     scale_x_continuous(labels = block_labels, breaks = seq(1:10)) +
+    ylim(c(0, 1)) +
     default_plot_theme +
     theme(#axis.text.x = element_blank(),
       axis.title.y = element_text(size = 24, face = "bold"),
       legend.text = element_text(face = "bold", size = 14),
-      legend.position = "right",
+      # legend.position = "right",
       legend.spacing.y = unit(1.0, 'lines'),
       #legend.key = element_rect(size = 2),
       legend.key.size = unit(4.75, 'lines'))
 }
 
-
 plot_slider_data = function(slider_data) {
-  label_width = 10
-  strategy_labels = c("opponent_moves" = str_wrap(STRATEGY_LOOKUP[["opponent_moves"]], label_width),
-                      "opponent_prev_move" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_move"]], label_width),
-                      "bot_prev_move" = str_wrap(STRATEGY_LOOKUP[["bot_prev_move"]], label_width),
-                      "opponent_bot_prev_move" = str_wrap(STRATEGY_LOOKUP[["opponent_bot_prev_move"]], label_width),
-                      "opponent_prev_two_moves" = str_wrap(STRATEGY_LOOKUP[["opponent_prev_two_moves"]], label_width),
-                      "bot_prev_two_moves" = str_wrap(STRATEGY_LOOKUP[["bot_prev_two_moves"]], label_width),
-                      "opponent_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_transitions"]], label_width),
-                      "opponent_courn_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_courn_transitions"]], label_width),
-                      "opponent_outcome_transitions" = str_wrap(STRATEGY_LOOKUP[["opponent_outcome_transitions"]], label_width),
-                      "opponent_outcome_prev_transition_dual" = str_wrap(STRATEGY_LOOKUP[["opponent_outcome_prev_transition_dual"]], label_width))
   q = unique(slider_data$statement)
   slider_data %>%
     ggplot(aes(x = bot_strategy, y = mean_resp, color = bot_strategy)) +
@@ -344,10 +248,95 @@ plot_slider_data = function(slider_data) {
 # PROCESS DATA =================================================================
 
 # Read in data
-# data = read_game_data(DATA_FILE)
-data = read_data(DATA_FILE)
+data = read_csv(DATA_FILE)
 data$bot_strategy = factor(data$bot_strategy, levels = STRATEGY_LEVELS)
-table(data$bot_strategy)
+
+# Remove all incomplete games
+incomplete_games = data %>%
+  group_by(game_id, player_id) %>%
+  summarize(rounds = max(round_index)) %>%
+  filter(rounds < NUM_ROUNDS) %>%
+  select(game_id) %>%
+  unique()
+incomplete_games
+
+data = data %>%
+  filter(!(game_id %in% incomplete_games$game_id))
+
+# TODO what's going on here??
+tmp = data %>% filter(is.na(player_move))
+tmp %>% group_by(sona_survey_code) %>% summarize(n())
+
+data = data %>% filter(!is.na(player_move))
+
+
+# Remove any duplicate complete games that have the same SONA survey code
+# NB: this can happen if somebody played all the way through but exited before receiving credit
+# First, fetch sona survey codes with multiple complete games
+repeat_codes = data %>%
+  group_by(sona_survey_code) %>%
+  filter(is_bot == 0) %>%
+  summarize(trials = n()) %>%
+  filter(trials > NUM_ROUNDS) %>%
+  select(sona_survey_code)
+repeat_codes
+# Next, get game id for the earlier complete game
+# NB: commented out code checks that we have slider/free resp data for at least one of the games
+duplicate_games = data %>%
+  filter(sona_survey_code %in% repeat_codes$sona_survey_code &
+           is_bot == 0  &
+           round_index == NUM_ROUNDS) %>%
+  select(sona_survey_code, game_id, player_id, round_begin_ts) %>%
+  # remove the earlier one since the later one has free response and slider data (confirm with joins below)
+  group_by(sona_survey_code) %>%
+  filter(round_begin_ts == max(round_begin_ts)) %>%
+  # inner_join(fr_data, by = c("game_id", "player_id")) %>%
+  # inner_join(slider_data, by = c("game_id", "player_id")) %>%
+  distinct(game_id)
+duplicate_games
+
+data = data %>%
+  filter(!game_id %in% duplicate_games$game_id)
+
+
+# Sanity check: anybody with trials != 300?
+trial_count = data %>%
+  filter(is_bot == 0) %>%
+  group_by(sona_survey_code) %>%
+  summarize(trials = n()) %>%
+  filter(trials != NUM_ROUNDS)
+trial_count
+
+
+# Check that there are no rows with memory >= 300
+# (this was a bug in early data)
+mem = data %>%
+  filter(round_index == NUM_ROUNDS & is_bot == 1) %>%
+  group_by(bot_strategy, game_id, sona_survey_code) %>%
+  select(bot_strategy, game_id, sona_survey_code, bot_round_memory)
+
+mem = mem %>%
+  rowwise() %>%
+  mutate(memory_sum =
+           sum(as.numeric(unlist(regmatches(bot_round_memory, gregexpr("[[:digit:]]+", bot_round_memory))))))
+
+mem %>% filter(memory_sum >= NUM_ROUNDS)
+
+# err_subj = data %>% filter(sona_survey_code == 26982, is_bot == 1)
+# err_subj$bot_round_memory
+
+data = data %>%
+  filter(sona_survey_code != 26982)
+
+
+# How many complete participants for each bot?
+data %>%
+  filter(is_bot == 0, round_index == NUM_ROUNDS) %>%
+  group_by(bot_strategy) %>%
+  summarize(subjects = n()) %>%
+  summarize(sum(subjects))
+
+
 
 
 fr_data = read_free_resp_data(FREE_RESP_FILE, data)
@@ -355,22 +344,196 @@ slider_data = read_slider_data(SLIDER_FILE, data)
 slider_summary = get_slider_summary(slider_data)
 
 
+unique(fr_data$player_id)
+unique(slider_data$player_id)
+unique(data$player_id[data$is_bot == 0])
+
+intersect(fr_data$player_id, data$player_id)
+intersect(slider_data$player_id, data$player_id)
+intersect(slider_data$player_id, fr_data$player_id)
+
 
 # ANALYSIS: Bot strategy win count differentials ===============================
 wcd_all = get_bot_strategy_win_count_differential(data)
+# exclude data for participant with 200+ losing choices of scissors...
+wcd_all = wcd_all %>% filter(win_count_diff <= 250)
 wcd_summary = get_bot_strategy_win_count_differential_summary(wcd_all)
 
-plot_bot_strategy_win_count_differential_summary(wcd_summary)
+wcd_summary %>%
+  ggplot(aes(x = bot_strategy, y = mean_win_count_diff)) +
+  geom_point(#aes(color = bot_strategy),
+             size = 6) +
+  geom_errorbar(aes(#color = bot_strategy,
+                    ymin = lower_se, ymax = upper_se),
+                width = 0.1, size = 1) +
+  # geom_jitter(data = wcd_all, aes(x = bot_strategy, y = win_count_diff),
+              # size = 2, alpha = 0.75, width = 0.25, height = 0) +
+  geom_hline(yintercept = 0, size = 1, linetype = "dashed") +
+  labs(x = "", y = "Bot win count differential") +
+  ggtitle("Adaptive bot performance against humans") +
+  scale_x_discrete(name = element_blank(),
+                   labels = strategy_labels) +
+  # ylim(c(-60, 50)) +
+  # scale_color_viridis(discrete = TRUE,
+                      # name = element_blank()) +
+  default_plot_theme +
+  theme(
+    plot.title = element_text(size = 32, face = "bold"),
+    axis.title.y = element_text(size = 24, face = "bold"),
+    # axis.text.x = element_text(size = 20, face = "bold", angle = 0, vjust = 1),
+    axis.text.x = element_text(size = 12, face = "bold", angle = 0, vjust = 1),
+    # axis.text.x = element_blank(),
+    # axis.text.y = element_text(face = "bold", size = 20),
+    legend.position = "none"
+  )
 
+
+# Basic analysis: which strategies are different from 0?
+table(wcd_all$bot_strategy)
+
+t.test(x = wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_transitions"]) # *
+t.test(x = wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_courn_transitions"]) # ***
+t.test(x = wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_prev_move"]) # NS
+t.test(x = wcd_all$win_count_diff[wcd_all$bot_strategy == "bot_prev_move"]) # **
+t.test(x = wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_outcome_transitions"]) # NS
+t.test(x = wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_bot_prev_move"]) # *
+t.test(x = wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_prev_two_moves"]) # ***
+t.test(x = wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_outcome_prev_transition_dual"]) # ***
+
+
+# Difference between participant-relative and bot-relative deps
+t.test(
+  c(
+    wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_transitions"],
+    wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_prev_move"]),
+  c(
+    wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_courn_transitions"],
+    wcd_all$win_count_diff[wcd_all$bot_strategy == "bot_prev_move"])
+)
+
+# Binomial tests
+binom.test(
+  x = sum(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_transitions"] < 0),
+  n = length(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_transitions"])
+)
+
+binom.test(
+  x = sum(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_courn_transitions"] < 0),
+  n = length(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_courn_transitions"])
+)
+
+binom.test(
+  x = sum(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_prev_move"] < 0),
+  n = length(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_prev_move"])
+)
+
+binom.test(
+  x = sum(wcd_all$win_count_diff[wcd_all$bot_strategy == "bot_prev_move"] < 0),
+  n = length(wcd_all$win_count_diff[wcd_all$bot_strategy == "bot_prev_move"])
+)
+
+# binom.test(
+#   x = sum(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_outcome_transitions"] < 0),
+#   n = length(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_outcome_transitions"])
+# )
+
+binom.test(
+  x = sum(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_bot_prev_move"] < 0),
+  n = length(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_bot_prev_move"])
+)
+
+binom.test(
+  x = sum(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_prev_two_moves"] <= 0),
+  n = length(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_prev_two_moves"])
+)
+
+binom.test(
+  x = sum(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_outcome_prev_transition_dual"] <= 0),
+  n = length(wcd_all$win_count_diff[wcd_all$bot_strategy == "opponent_outcome_prev_transition_dual"])
+)
+
+
+
+
+# ANALYSIS: compare to dyad results ============================================
+source('../../rps/analysis/manuscript_analysis.R') # NB: if this fails, run again
+
+# Keep only the
+dyad_wcd_summary = bind_rows(
+  get_win_count_differential_summary(player_transition_utils, "opponent_transitions"),
+  get_win_count_differential_summary(player_transition_cournot_utils, "opponent_courn_transitions"),
+  get_win_count_differential_summary(player_prev_move_utils, "opponent_prev_move"),
+  get_win_count_differential_summary(opponent_prev_move_utils, "bot_prev_move"),
+  get_win_count_differential_summary(player_transition_prev_outcome_utils, "opponent_outcome_transitions"),
+  get_win_count_differential_summary(player_opponent_prev_move_utils, "opponent_bot_prev_move"),
+  get_win_count_differential_summary(player_prev_2move_utils, "opponent_prev_two_moves"),
+  get_win_count_differential_summary(player_transition_prev_transition_prev_outcome_utils, "opponent_outcome_prev_transition_dual")
+)
+dyad_wcd_summary$category = factor(dyad_wcd_summary$category, levels = STRATEGY_LEVELS)
+
+dyad_wcd_summary %>%
+  ggplot(aes(x = category, y = mean_wins)) +
+  geom_point(#aes(color = category),
+             size = 6) +
+  geom_errorbar(aes(#color = category,
+                    ymin = ci_lower, ymax = ci_upper),
+                width = 0.1, size = 1) +
+  # geom_jitter(data = wcd_all, aes(x = bot_strategy, y = win_count_diff),
+  # size = 2, alpha = 0.75, width = 0.25, height = 0) +
+  # geom_hline(yintercept = 0, size = 1, linetype = "dashed", color = "red") +
+  labs(x = "", y = "Expected win count differential") +
+  ggtitle("Exploitability in human dyad play") +
+  scale_x_discrete(name = element_blank(),
+                   labels = strategy_labels) +
+  ylim(c(0, 90)) +
+  #scale_color_viridis(discrete = TRUE,
+  #                    name = element_blank()) +
+  default_plot_theme +
+  theme(
+    plot.title = element_text(size = 32, face = "bold"),
+    axis.title.y = element_text(size = 24, face = "bold"),
+    # axis.text.x = element_text(size = 20, face = "bold", angle = 0, vjust = 1),
+    axis.text.x = element_text(size = 12, face = "bold", angle = 0, vjust = 1),
+    # axis.text.x = element_blank(),
+    # axis.text.y = element_text(face = "bold", size = 20),
+    legend.position = "none"
+  )
+
+
+# Correlation between expected win count diff.
+# and empirical win count diffs from adaptive bots
+cor.test(dyad_wcd_summary$mean_wins, wcd_summary$mean_win_count_diff)
 
 
 # ANALYSIS: Bot strategy win percentages by block ==============================
 
-subject_block_data = get_subject_block_data(data, blocksize = 30)
-block_data_summary = get_block_data_summary(subject_block_data)
+block_win_data = get_bot_block_data(data, blocksize = (NUM_ROUNDS/4))
+block_data_summary = get_block_data_summary(block_win_data)
 
-plot_bot_strategy_win_pct_by_block(block_data_summary)
+# Plot win percentage by block for each strategy
+plot_block_summary(summary_data = block_data_summary %>% filter(bot_strategy == "opponent_transitions"),
+                   individ_data = block_win_data %>% filter(bot_strategy == "opponent_transitions"))
 
+plot_block_summary(summary_data = block_data_summary %>% filter(bot_strategy == "opponent_courn_transitions"),
+                   individ_data = block_win_data %>% filter(bot_strategy == "opponent_courn_transitions"))
+
+plot_block_summary(summary_data = block_data_summary %>% filter(bot_strategy == "opponent_prev_move"),
+                   individ_data = block_win_data %>% filter(bot_strategy == "opponent_prev_move"))
+
+plot_block_summary(summary_data = block_data_summary %>% filter(bot_strategy == "bot_prev_move"),
+                   individ_data = block_win_data %>% filter(bot_strategy == "bot_prev_move"))
+
+plot_block_summary(summary_data = block_data_summary %>% filter(bot_strategy == "opponent_outcome_transitions"),
+                   individ_data = block_win_data %>% filter(bot_strategy == "opponent_outcome_transitions"))
+
+plot_block_summary(summary_data = block_data_summary %>% filter(bot_strategy == "opponent_bot_prev_move"),
+                   individ_data = block_win_data %>% filter(bot_strategy == "opponent_bot_prev_move"))
+
+plot_block_summary(summary_data = block_data_summary %>% filter(bot_strategy == "opponent_prev_two_moves"),
+                   individ_data = block_win_data %>% filter(bot_strategy == "opponent_prev_two_moves"))
+
+plot_block_summary(summary_data = block_data_summary %>% filter(bot_strategy == "opponent_outcome_prev_transition_dual"),
+                   individ_data = block_win_data %>% filter(bot_strategy == "opponent_outcome_prev_transition_dual"))
 
 
 
@@ -408,3 +571,82 @@ q5_plot = slider_summary %>%
 
 q1_plot + q2_plot + q3_plot + q4_plot + q5_plot +
   plot_layout(ncol = 2)
+
+
+
+# ANALYSIS: Scratch ============================================================
+
+# library(rjson)
+
+data %>%
+  filter(is_bot == 0, round_index == NUM_ROUNDS) %>%
+  group_by(bot_strategy) %>%
+  summarize(subjects = n())
+  # summarize(sum(subjects))
+
+mem = data %>%
+  filter(round_index == NUM_ROUNDS & is_bot == 1) %>%
+  group_by(bot_strategy, game_id) %>%
+  select(bot_strategy, game_id, bot_round_memory)
+
+
+mem = mem %>%
+  rowwise() %>%
+  mutate(memory_sum =
+           sum(as.numeric(unlist(regmatches(bot_round_memory, gregexpr("[[:digit:]]+", bot_round_memory))))))
+
+
+# mem = data %>% filter(game_id == "b684bbe7-ba7c-41f8-8589-674c2979f0f6", is_bot == 1, round_index == NUM_ROUNDS) %>%
+#   select(bot_round_memory)
+
+data %>% filter(game_id == "b684bbe7-ba7c-41f8-8589-674c2979f0f6", is_bot == 0) %>%
+  group_by(player_id) %>%
+  summarize(n())
+
+mem$bot_round_memory
+
+# 21 below, 21 in first pilot round
+#' opponent_bot_prev_move (27 cells): 299
+#' opponent_prev_two_moves (27 cells): 298
+#' bot_prev_move (9 cells): 299, 750
+#' opponent_outcome_transitions (9 cells): 596, 566
+#' opponent_courn_transitions (3 cells): 299, 297, 299
+#' opponent_outcome_prev_transition_dual (27 cells): 574, 2081, 298, 298
+#' opponent_prev_move (9 cells): 598, 357, 299, 641
+#' opponent_transitions (3 cells): 300, 299, 598, 299 (NB: 300 doesn't count here, counts go 0s in round 1 to 2 + transitions in round 2)
+#'
+# -> From above, 11 are usable
+safe_game_ids = c(
+  "c9b597bc-ff5e-4e76-9cf7-7048bac572a6", # opponent_bot_prev_move
+  "ff64c8a4-babc-4874-a895-a21215c22b43", # opponent_prev_two_moves
+  "7af733f0-7253-4dc5-9cea-1e89f7dbc3a6", # bot_prev_move
+  "a0e44570-8d8d-4472-b087-5046773411fa", # opponent_courn_transitions
+  "c169a038-ca59-4ede-801f-476ec48cba2f", # opponent_courn_transitions
+  "7833ab77-0d2c-4f01-8127-a84ff09daef2", # opponent_courn_transitions
+  "fcc1cce0-e209-4a78-9581-8bfb7bb53751", # opponent_prev_move
+  "e6e34c91-95ac-4b31-aea1-f850b64c9b5f", # opponent_outcome_prev_transition_dual,
+  "de6123c4-e8fd-4699-95d1-f41d35e49ca3", # opponent_outcome_prev_transition_dual (no slider data for this person)
+  "5a3a0315-9259-41d0-8ec0-a8188333609a", # opponent_transitions
+  "b684bbe7-ba7c-41f8-8589-674c2979f0f6" # opponent_transitions
+)
+
+
+
+mem$bot_round_memory[mem$sona_survey_code == "31656"]
+
+#' Subsequent batch
+#' 34181: 299
+#' 22809: 299
+#' 23814: 295
+#' 24723: 298
+#' 26084: 299
+#' 30527: 297
+#' 36067: 299 # NB: we may want to cut this person, they played paper 268 times in a losing sequence...
+#' 30289: 298
+#' 26999: 299
+#' 34027: 299
+#' 31656: 298
+#'
+
+jsonlite::fromJSON(mem$bot_round_memory[1])
+

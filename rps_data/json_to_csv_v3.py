@@ -19,9 +19,9 @@ with io.open(output_file, "w") as csv_output:
     csvwriter = csv.writer(csv_output)
     write_index = 0
     files = [f for f in listdir(DATA_PATH) if f.endswith(".json")
-                # and not "TEST" in f
-                # and not "freeResp" in f
-                # and not "sliderData" in f
+                and not "TEST" in f
+                and not "freeResp" in f
+                and not "sliderData" in f
             ]
     for f in files:
         with io.open(join(DATA_PATH + f), "r", encoding = "utf-8", errors = "ignore") as readfile:

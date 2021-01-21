@@ -1,18 +1,28 @@
 """
 To run this:
-- cd /Users/erikbrockbank/web/vullab/data_analysis/rps_data
-- python json_to_csv_freeResp.py
+- cd /rps/analysis/
+- python json_to_csv_freeResp.py --experiment {name}
+    - the `experiment` flag should be followed by either "rps_v1", "rps_v2", or "rps_v3"
 """
 
+import argparse
+import csv
 import io
 import json
-import csv
 from os import listdir
 from os.path import isfile, join
 
-# TODO make these command line flags
-EXPERIMENT = "rps_v2" # useful identifier for experiment data: modify this to reflect the particular experiment
-DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/v2/" # path to data files: modify as needed for particular experiments
+
+# Parse command line flags
+parser = argparse.ArgumentParser(description = "Script for encoding free response questionnaire data.")
+parser.add_argument("--experiment", required = True, choices=["rps_v1", "rps_v2", "rps_v3"],
+                    help="Name of experiment (used for file output), e.g., 'rps_v1'")
+
+args = parser.parse_args()
+EXPERIMENT = args.experiment
+if EXPERIMENT == "rps_v1": DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/v1/"
+elif EXPERIMENT == "rps_v2": DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/v2/"
+elif EXPERIMENT == "rps_v3": DATA_PATH = "/Users/erikbrockbank/web/vullab/rps/data/v3/"
 
 
 output_file = "{}_data_freeResp.csv".format(EXPERIMENT) # name of csv file to write to
